@@ -1,5 +1,7 @@
 # 个人资料库检索系统
 
+[中文](README.md) | [English](README.en.md)
+
 Windows 离线资料检索与关联推荐工具。读取本地 Markdown、UTF-8 纯文本和 Word 文档，帮助用户按内容找回资料并查看相关文档。
 
 ## 能力
