@@ -4,6 +4,10 @@
 
 An offline document search and recommendation tool for Windows. It reads local Markdown files, UTF-8 plain text, and Word documents to help you find material by content and discover related documents.
 
+## Screenshot
+
+![Document recommendations and relationship graph using built-in demo data](screenshot.png)
+
 ## Features
 
 - Browse documents by directory.
@@ -47,3 +51,7 @@ Current tests cover core data structures, readers, service integration, and smok
 ## Dependencies
 
 PySide6, jieba, and python-docx. See `requirements.txt` for specific versions.
+
+## License
+
+Original source code and documentation in this repository are under the [MIT License](LICENSE).

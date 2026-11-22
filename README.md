@@ -4,6 +4,10 @@
 
 Windows 离线资料检索与关联推荐工具。读取本地 Markdown、UTF-8 纯文本和 Word 文档，帮助用户按内容找回资料并查看相关文档。
 
+## 界面预览
+
+![使用内置演示数据的文档推荐与关系图](screenshot.png)
+
 ## 能力
 
 - 按目录浏览文档。
@@ -47,3 +51,7 @@ python -m unittest discover -s tests -v
 ## 依赖
 
 PySide6、jieba、python-docx。具体版本见 `requirements.txt`。
+
+## 许可
+
+本仓库原创源码和文档采用 [MIT 许可证](LICENSE)。
