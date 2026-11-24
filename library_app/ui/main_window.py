@@ -153,19 +153,19 @@ def doc_html(doc: DocumentView, terms: list[str] | None, theme: Theme,
         meta = "命中词已高亮 · " + " / ".join(terms)
     return f"""
     <html><body style="font-family:{theme.serif};color:{theme.text};">
-      <div style="font-family:{theme.mono};font-size:10px;color:{theme.faint};">
+      <div style="font-family:{theme.mono};font-size:11px;color:{theme.faint};">
         DOC #{doc.doc_id:02d} &nbsp;·&nbsp; {esc(doc.relative_path.rsplit('/', 1)[0] if '/' in doc.relative_path else '根目录')}
       </div>
       <h1 style="font-family:{theme.serif};font-size:24px;font-weight:600;
                  color:{theme.text};margin:10px 0 7px 0;">{title_html}</h1>
-      <div style="font-family:{theme.mono};font-size:10px;color:{theme.faint};">
+      <div style="font-family:{theme.mono};font-size:11px;color:{theme.faint};">
         {esc(doc.relative_path)} &nbsp;·&nbsp; {esc(meta)}
       </div>
       <div style="height:14px;"></div>
-      <div style="font-family:{theme.serif};font-size:14px;color:{theme.text};">
+      <div style="font-family:{theme.serif};font-size:15px;color:{theme.text};">
         {''.join(body_html)}
       </div>
-      <div style="font-family:{theme.mono};font-size:9px;color:{theme.faint};
+      <div style="font-family:{theme.mono};font-size:10px;color:{theme.faint};
                   margin-top:22px;padding-top:10px;border-top:1px solid {theme.line_soft};">
         SAMPLE LIBRARY · READ ONLY &nbsp;&nbsp; SPAN [start, end)
       </div>
@@ -433,9 +433,9 @@ class CanvasArea(QWidget):
         self.stat_values["trunc"].setText(str(trunc))
         self.center_line.setText(
             f'<span style="color:{self._theme.muted};">CENTER</span> '
-            f'<b style="font-family:{self._theme.serif};font-size:12px;color:{self._theme.text};">'
+            f'<b style="font-family:{self._theme.serif};font-size:13px;color:{self._theme.text};">'
             f"{esc(center_title)}</b>"
-            f'<span style="color:{self._theme.muted};"> · 预设 {esc(preset_label)} · 每圈最多 10 个节点</span>'
+            f'<span style="color:{self._theme.muted};"> · 预设 {esc(preset_label)}</span>'
         )
 
     def set_doc_open(self, open_: bool) -> None:

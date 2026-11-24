@@ -212,12 +212,12 @@ class GraphViewWidget(QWidget):
     def _draw_nodes(self, p: QPainter, t: Theme, pos: dict[int, QPointF]) -> None:
         assert self._graph is not None
         label_font = QFont(t.serif)
-        label_font.setPixelSize(11)
+        label_font.setPixelSize(12)
         center_font = QFont(t.serif)
-        center_font.setPixelSize(12)
+        center_font.setPixelSize(13)
         center_font.setBold(True)
         id_font = QFont(t.mono)
-        id_font.setPixelSize(10)
+        id_font.setPixelSize(11)
 
         for node in self._graph.nodes:
             ppos = pos.get(node.doc_id)
@@ -304,7 +304,7 @@ class GraphViewWidget(QWidget):
         p.setBrush(Qt.NoBrush)
 
         font = QFont(t.mono)
-        font.setPixelSize(9)
+        font.setPixelSize(10)
         p.setFont(font)
         metrics = QFontMetrics(font)
         text_color = QColor(t.muted)
@@ -358,12 +358,12 @@ class GraphViewWidget(QWidget):
         # 箭头指代说明
         p.setPen(QColor(t.text_dim))
         p.drawText(QPointF(bar.left() + 10, bar.top() + 34),
-                   "箭头 = 推荐方向（推荐来源 → 被推荐文档）；灰线 = 同目录结构")
+                   "箭头 = 推荐方向（来源 → 被推荐文档）；灰线 = 同目录结构")
 
     def _draw_scale(self, p: QPainter, t: Theme) -> None:
         avail = self._available()
         font = QFont(t.mono)
-        font.setPixelSize(9)
+        font.setPixelSize(10)
         p.setFont(font)
         p.setPen(QColor(t.faint))
         text = "GRID 26 PX · 1:1"
@@ -387,7 +387,7 @@ class GraphViewWidget(QWidget):
         avail = self._available()
         text = f"{truncated} 个节点因该圈满 10 个被截去"
         font = QFont(t.mono)
-        font.setPixelSize(9)
+        font.setPixelSize(10)
         p.setFont(font)
         width = QFontMetrics(font).horizontalAdvance(text) + 14
         rect = QRectF(avail.right() - width - 2, avail.top() + 6, width, 20)
