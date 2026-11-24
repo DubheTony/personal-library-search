@@ -128,13 +128,13 @@ class RailButton(QAbstractButton):
         self._draw_icon(p, glyph_color)
 
         label_font = QFont(t.sans)
-        label_font.setPixelSize(9)
+        label_font.setPixelSize(10)
         p.setFont(label_font)
         p.setPen(text_color)
-        p.drawText(QRect(0, 37, rect.width(), 16), Qt.AlignCenter, self.text_label)
+        p.drawText(QRect(0, 36, rect.width(), 16), Qt.AlignCenter, self.text_label)
 
         idx_font = QFont(t.mono)
-        idx_font.setPixelSize(6)
+        idx_font.setPixelSize(9)
         p.setFont(idx_font)
         p.setPen(index_color)
         p.drawText(QRect(0, 55, rect.width(), 10), Qt.AlignCenter, self.index)
@@ -269,10 +269,10 @@ class ThemeSwitcher(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         font = QFont(t.mono)
-        font.setPixelSize(6)
+        font.setPixelSize(9)
         p.setFont(font)
         p.setPen(QColor(t.faint))
-        p.drawText(QRect(0, 5, 30, 20), Qt.AlignRight | Qt.AlignVCenter, "SKIN")
+        p.drawText(QRect(0, 5, 34, 20), Qt.AlignRight | Qt.AlignVCenter, "SKIN")
         for i, key in enumerate(THEME_ORDER):
             th = THEMES[key]
             center = self._circles()[i]
@@ -285,7 +285,7 @@ class ThemeSwitcher(QWidget):
                 p.setPen(QPen(QColor(t.text), 1.6))
                 p.drawEllipse(center, 11.5, 11.5)
             label_font = QFont(th.sans)
-            label_font.setPixelSize(7)
+            label_font.setPixelSize(9)
             p.setFont(label_font)
             p.setPen(QColor(th.on_accent))
             p.drawText(QRectF(center.x() - 8, center.y() - 8, 16, 16),
@@ -330,7 +330,7 @@ class Toast(QWidget):
     def show_message(self, text: str, msec: int = 1900) -> None:
         self._text = text
         font = QFont(self._theme.sans)
-        font.setPixelSize(10)
+        font.setPixelSize(11)
         width = QFontMetrics(font).horizontalAdvance(text) + 34
         self.setFixedWidth(max(160, width))
         self._position()
