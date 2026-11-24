@@ -93,8 +93,8 @@ PAPER = Theme(
     canvas="#F5EFE4",
     text="#241F1A",
     text_dim="#4A4238",
-    muted="#7D7264",
-    faint="#A89D8C",
+    muted="#6A5E4F",
+    faint="#8A7D6B",
     line="#DED4C2",
     line_soft="#EAE2D3",
     accent="#A23E2A",
@@ -113,7 +113,7 @@ PAPER = Theme(
     edge_rec="#A23E2A",
     node_fill="#FBF7EF",
     node_stroke="#B9AB96",
-    node_id="#6F6455",
+    node_id="#5E5346",
     node_label="#3B342B",
     center_fill="#A23E2A",
     center_id="#FBF7EF",
@@ -147,8 +147,8 @@ OBSERVATORY = Theme(
     canvas="#080D0C",
     text="#DAE4DE",
     text_dim="#B7C6BF",
-    muted="#8B9F95",
-    faint="#62766B",
+    muted="#A3B7AD",
+    faint="#7E9287",
     line="#22332C",
     line_soft="#1A2721",
     accent="#E3B04B",
@@ -167,7 +167,7 @@ OBSERVATORY = Theme(
     edge_rec="#E3B04B",
     node_fill="#0C1512",
     node_stroke="#455D52",
-    node_id="#8AA096",
+    node_id="#9AAFA4",
     node_label="#B9C8C1",
     center_fill="#E3B04B",
     center_id="#171208",
@@ -201,8 +201,8 @@ DRAFTING = Theme(
     canvas="#EDF3F7",
     text="#0E2334",
     text_dim="#31506A",
-    muted="#6C8194",
-    faint="#93A7B7",
+    muted="#556C7F",
+    faint="#6D8497",
     line="#C7D5E1",
     line_soft="#DEE8EF",
     accent="#1D4ED8",
@@ -221,7 +221,7 @@ DRAFTING = Theme(
     edge_rec="#F05A28",
     node_fill="#FFFFFF",
     node_stroke="#7E9CB5",
-    node_id="#6C8194",
+    node_id="#556C7F",
     node_label="#173B54",
     center_fill="#1D4ED8",
     center_id="#FFFFFF",
@@ -246,7 +246,7 @@ QSS_TEMPLATE = Template(
 * { outline: none; }
 QWidget {
     font-family: "$sans";
-    font-size: 12px;
+    font-size: 13px;
     color: $text;
 }
 QMainWindow, QWidget#Root { background: $bg; }
@@ -255,38 +255,38 @@ QMainWindow, QWidget#Root { background: $bg; }
 QFrame#TopBar { background: $topbar; border-bottom: 1px solid $line; }
 QLabel#BrandTitle { font-family: "$mono"; font-size: 14px; font-weight: 600; color: $text; }
 QLabel#BrandCn { font-family: "$serif"; font-size: 14px; font-weight: 600; color: $text_dim; }
-QLabel#BrandSub { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#BrandSub { font-family: "$mono"; font-size: 11px; color: $faint; }
 QFrame#TopSearch { background: $card; border: 1px solid $line; border-radius: $radius; }
-QLabel#SearchPrefix { font-family: "$mono"; font-size: 10px; color: $muted; border-right: 1px solid $line_soft; padding: 0 9px 0 10px; }
-QLineEdit#SearchInput { background: transparent; border: none; color: $text; font-size: 13px; selection-background-color: $accent_soft; selection-color: $text; }
-QPushButton#SearchButton { background: $accent; color: $on_accent; border: none; border-radius: $radius; font-family: "$mono"; font-size: 10px; padding: 0 12px; }
+QLabel#SearchPrefix { font-family: "$mono"; font-size: 11px; color: $muted; border-right: 1px solid $line_soft; padding: 0 9px 0 10px; }
+QLineEdit#SearchInput { background: transparent; border: none; color: $text; font-size: 14px; selection-background-color: $accent_soft; selection-color: $text; }
+QPushButton#SearchButton { background: $accent; color: $on_accent; border: none; border-radius: $radius; font-family: "$mono"; font-size: 11px; padding: 0 12px; }
 QPushButton#SearchButton:hover { background: $accent_deep; }
-QLabel#TopStat { font-family: "$mono"; font-size: 11px; color: $muted; }
+QLabel#TopStat { font-family: "$mono"; font-size: 12px; color: $muted; }
 QFrame#ZoomBar { background: $card; border: 1px solid $line; border-radius: $radius; }
-QPushButton#ZoomButton { background: transparent; border: none; color: $muted; font-family: "$mono"; font-size: 13px; padding: 0; }
+QPushButton#ZoomButton { background: transparent; border: none; color: $muted; font-family: "$mono"; font-size: 14px; padding: 0; }
 QPushButton#ZoomButton:hover { color: $text; background: $accent_soft; }
-QPushButton#ZoomValue { background: transparent; border: none; color: $text_dim; font-family: "$mono"; font-size: 10px; padding: 0; }
+QPushButton#ZoomValue { background: transparent; border: none; color: $text_dim; font-family: "$mono"; font-size: 11px; padding: 0; }
 QPushButton#ZoomValue:hover { color: $accent; }
-QPushButton#IssueButton { border: none; background: transparent; color: $danger; font-family: "$mono"; font-size: 11px; padding: 1px 0; }
+QPushButton#IssueButton { border: none; background: transparent; color: $danger; font-family: "$mono"; font-size: 12px; padding: 1px 0; }
 QPushButton#IssueButton:hover { color: $text; }
 QFrame#VLine { background: $line; border: none; }
 
 /* rail */
 QFrame#Rail { background: $rail; border-right: 1px solid $line; }
-QLabel#RailFoot { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#RailFoot { font-family: "$mono"; font-size: 11px; color: $faint; }
 
 /* panel */
 QFrame#Panel { background: $panel; border-right: 1px solid $line; }
 QFrame#PanelHead { background: $panel_alt; border-bottom: 1px solid $line; }
-QLabel#PanelTitle { font-family: "$mono"; font-size: 10px; color: $text_dim; }
-QLabel#PanelHint { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#PanelTitle { font-family: "$mono"; font-size: 11px; color: $text_dim; }
+QLabel#PanelHint { font-family: "$mono"; font-size: 11px; color: $faint; }
 QScrollArea { border: none; background: transparent; }
 QScrollArea > QWidget > QWidget { background: transparent; }
 QLabel#SectionTitle { font-family: "$serif"; font-size: 14px; font-weight: 600; color: $text; }
-QLabel#Kicker { font-family: "$mono"; font-size: 10px; color: $faint; }
-QLabel#Note { font-size: 11px; color: $muted; background: transparent; border: none; }
-QLabel#MonoMuted { font-family: "$mono"; font-size: 10px; color: $muted; }
-QLabel#MonoFaint { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#Kicker { font-family: "$mono"; font-size: 11px; color: $faint; }
+QLabel#Note { font-size: 12px; color: $muted; background: transparent; border: none; }
+QLabel#MonoMuted { font-family: "$mono"; font-size: 11px; color: $muted; }
+QLabel#MonoFaint { font-family: "$mono"; font-size: 11px; color: $faint; }
 
 /* cards */
 QFrame#ResultCard, QFrame#RecCard, QFrame#DocRow {
@@ -318,31 +318,31 @@ QFrame#TimingCell { background: $card; border: 1px solid $line; border-radius: $
 QFrame#TimingCell[active="true"] { background: $accent_soft; border-color: $accent; }
 QFrame#TreeScroll { background: transparent; border: none; border-bottom: 1px solid $line; }
 
-QLabel#RowTitle { font-family: "$serif"; font-size: 13px; font-weight: 600; color: $text; }
-QLabel#RowPath { font-family: "$mono"; font-size: 10px; color: $faint; }
-QLabel#Snippet { font-size: 11px; color: $muted; }
-QLabel#Reason { font-size: 11px; color: $muted; }
-QLabel#HitBadge { font-family: "$mono"; font-size: 10px; color: $muted; border: 1px solid $line; padding: 1px 4px; }
+QLabel#RowTitle { font-family: "$serif"; font-size: 14px; font-weight: 600; color: $text; }
+QLabel#RowPath { font-family: "$mono"; font-size: 11px; color: $faint; }
+QLabel#Snippet { font-size: 12px; color: $muted; }
+QLabel#Reason { font-size: 12px; color: $muted; }
+QLabel#HitBadge { font-family: "$mono"; font-size: 11px; color: $muted; border: 1px solid $line; padding: 1px 4px; }
 QLabel#RecTotal { font-family: "$mono"; font-size: 16px; color: $accent; }
-QLabel#ScoreKey { font-family: "$kai"; font-size: 11px; color: $faint; }
-QLabel#Chips { font-size: 10px; color: $text_dim; }
-QLabel#TimingLabel { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#ScoreKey { font-family: "$kai"; font-size: 12px; color: $faint; }
+QLabel#Chips { font-size: 11px; color: $text_dim; }
+QLabel#TimingLabel { font-family: "$mono"; font-size: 11px; color: $faint; }
 QLabel#TimingValue { font-family: "$mono"; font-size: 14px; color: $text_dim; }
 QFrame#TimingCell[active="true"] QLabel#TimingValue { color: $accent; }
-QLabel#TimingUnit { font-family: "$mono"; font-size: 10px; color: $muted; }
-QLabel#ScopeName { font-size: 11px; color: $muted; }
-QLabel#FreqFoot { font-family: "$mono"; font-size: 10px; color: $faint; }
-QLabel#FreqOK { font-family: "$mono"; font-size: 10px; color: $signal; }
-QLabel#AlgoName { font-family: "$mono"; font-size: 10px; color: $muted; }
+QLabel#TimingUnit { font-family: "$mono"; font-size: 11px; color: $muted; }
+QLabel#ScopeName { font-size: 12px; color: $muted; }
+QLabel#FreqFoot { font-family: "$mono"; font-size: 11px; color: $faint; }
+QLabel#FreqOK { font-family: "$mono"; font-size: 11px; color: $signal; }
+QLabel#AlgoName { font-family: "$mono"; font-size: 11px; color: $muted; }
 
 /* tree */
-QLabel#TreeName { font-size: 12px; color: $text_dim; }
-QLabel#TreeCount { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#TreeName { font-size: 13px; color: $text_dim; }
+QLabel#TreeCount { font-family: "$mono"; font-size: 11px; color: $faint; }
 QFrame#TreeRow[kind="folder"] QLabel#TreeName { font-weight: 600; }
 QFrame#TreeRow[kind="folder"][active="true"] QLabel#TreeName { color: $accent_deep; }
 QFrame#TreeRow[kind="doc"][active="true"] QLabel#TreeName { color: $signal; }
-QLabel#Dot { font-family: "$mono"; font-size: 11px; color: $faint; }
-QToolButton#Caret { background: transparent; border: none; color: $faint; font-family: "$mono"; font-size: 10px; padding: 0; }
+QLabel#Dot { font-family: "$mono"; font-size: 12px; color: $faint; }
+QToolButton#Caret { background: transparent; border: none; color: $faint; font-family: "$mono"; font-size: 11px; padding: 0; }
 QToolButton#Caret:hover { color: $text; }
 
 /* segments */
@@ -352,22 +352,22 @@ QPushButton#Segment {
     border-radius: $radius;
     color: $muted;
     font-family: "$mono";
-    font-size: 10px;
+    font-size: 11px;
     padding: 5px 8px;
 }
 QPushButton#Segment:hover { border-color: $accent; color: $text; }
 QPushButton#Segment:checked { background: $accent; border-color: $accent; color: $on_accent; }
-QPushButton#Ghost { background: transparent; border: none; color: $muted; font-family: "$mono"; font-size: 10px; padding: 3px 0; }
+QPushButton#Ghost { background: transparent; border: none; color: $muted; font-family: "$mono"; font-size: 11px; padding: 3px 0; }
 QPushButton#Ghost:hover { color: $text; }
-QPushButton#Primary { background: transparent; border: none; color: $accent; font-family: "$mono"; font-size: 10px; padding: 3px 0; }
+QPushButton#Primary { background: transparent; border: none; color: $accent; font-family: "$mono"; font-size: 11px; padding: 3px 0; }
 QPushButton#Primary:hover { color: $accent_deep; }
 QPushButton#CloseButton { background: transparent; border: none; color: $muted; font-family: "$mono"; font-size: 15px; }
 QPushButton#CloseButton:hover { background: $line_soft; color: $text; }
 
 /* empty */
 QLabel#EmptyGlyph { font-family: "$mono"; font-size: 28px; color: $line; }
-QLabel#EmptyTitle { font-size: 12px; color: $muted; }
-QLabel#EmptyHint { font-size: 11px; color: $faint; }
+QLabel#EmptyTitle { font-size: 13px; color: $muted; }
+QLabel#EmptyHint { font-size: 12px; color: $faint; }
 
 /* bars / meters */
 QProgressBar { background: $line_soft; border: none; border-radius: 2px; }
@@ -381,23 +381,23 @@ QProgressBar#MeterK::chunk { background: $meter_k; }
 /* canvas */
 QWidget#CanvasArea { background: $canvas; }
 QFrame#MapHead { background: transparent; border-bottom: 1px solid $line; }
-QLabel#MapKicker { font-family: "$mono"; font-size: 10px; color: $muted; }
+QLabel#MapKicker { font-family: "$mono"; font-size: 11px; color: $muted; }
 QLabel#MapTitle { font-family: "$serif"; font-size: 19px; font-weight: 600; color: $text; }
-QLabel#MapTitleEn { font-family: "$mono"; font-size: 10px; color: $faint; }
-QLabel#MapCenter { font-size: 11px; color: $muted; }
+QLabel#MapTitleEn { font-family: "$mono"; font-size: 11px; color: $faint; }
+QLabel#MapCenter { font-size: 12px; color: $muted; }
 QFrame#KickLine { background: $signal; border: none; }
 QFrame#StatsBox { background: $card; border: 1px solid $line; border-radius: $radius; }
 QFrame#StatCell { background: transparent; border-right: 1px solid $line_soft; }
-QLabel#StatLabel { font-family: "$mono"; font-size: 10px; color: $faint; }
-QLabel#StatValue { font-family: "$mono"; font-size: 13px; color: $text; }
-QLabel#StatValueHot { font-family: "$mono"; font-size: 13px; color: $signal; }
+QLabel#StatLabel { font-family: "$mono"; font-size: 11px; color: $faint; }
+QLabel#StatValue { font-family: "$mono"; font-size: 14px; color: $text; }
+QLabel#StatValueHot { font-family: "$mono"; font-size: 14px; color: $signal; }
 
 /* doc panel */
 QFrame#DocPanel { background: $panel; border-left: 1px solid $line; }
 QFrame#DocHead { background: $panel_alt; border-bottom: 1px solid $line; }
-QLabel#DocLabel { font-family: "$mono"; font-size: 10px; color: $muted; }
-QLabel#DocLabelStrong { font-family: "$mono"; font-size: 10px; color: $text; }
-QLabel#CenterBadge { font-family: "$mono"; font-size: 10px; color: $accent; }
+QLabel#DocLabel { font-family: "$mono"; font-size: 11px; color: $muted; }
+QLabel#DocLabelStrong { font-family: "$mono"; font-size: 11px; color: $text; }
+QLabel#CenterBadge { font-family: "$mono"; font-size: 11px; color: $accent; }
 QTextBrowser#DocText {
     background: $panel;
     border: none;
@@ -409,13 +409,13 @@ QTextBrowser#DocText QScrollBar:vertical { background: transparent; }
 
 /* status */
 QFrame#StatusBar { background: $panel_alt; border-top: 1px solid $line; }
-QLabel#StatusText { font-family: "$mono"; font-size: 10px; color: $faint; }
+QLabel#StatusText { font-family: "$mono"; font-size: 11px; color: $faint; }
 
 /* issue */
 QFrame#IssuePopup { background: $panel; border: 1px solid $line; }
-QLabel#IssueTitle { font-family: "$mono"; font-size: 10px; color: $text_dim; }
-QLabel#IssueFile { font-family: "$mono"; font-size: 11px; color: $accent; }
-QLabel#IssueText { font-size: 11px; color: $muted; }
+QLabel#IssueTitle { font-family: "$mono"; font-size: 11px; color: $text_dim; }
+QLabel#IssueFile { font-family: "$mono"; font-size: 12px; color: $accent; }
+QLabel#IssueText { font-size: 12px; color: $muted; }
 
 /* scrollbars / tooltips */
 QScrollBar:vertical { background: transparent; width: 9px; margin: 0; }
@@ -427,7 +427,7 @@ QScrollBar:horizontal { background: transparent; height: 9px; }
 QScrollBar::handle:horizontal { background: $scroll; min-width: 22px; border-radius: 4px; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
-QToolTip { background: $card; color: $text; border: 1px solid $line; padding: 4px 6px; font-size: 11px; }
+QToolTip { background: $card; color: $text; border: 1px solid $line; padding: 4px 6px; font-size: 12px; }
     """
 )
 
