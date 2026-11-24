@@ -16,6 +16,7 @@ from ..theme import Theme
 
 class GraphViewWidget(QWidget):
     node_clicked = Signal(int)
+    LEGEND_H = 44
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -211,12 +212,12 @@ class GraphViewWidget(QWidget):
     def _draw_nodes(self, p: QPainter, t: Theme, pos: dict[int, QPointF]) -> None:
         assert self._graph is not None
         label_font = QFont(t.serif)
-        label_font.setPixelSize(10)
+        label_font.setPixelSize(11)
         center_font = QFont(t.serif)
-        center_font.setPixelSize(11)
+        center_font.setPixelSize(12)
         center_font.setBold(True)
         id_font = QFont(t.mono)
-        id_font.setPixelSize(8)
+        id_font.setPixelSize(10)
 
         for node in self._graph.nodes:
             ppos = pos.get(node.doc_id)
@@ -295,74 +296,84 @@ class GraphViewWidget(QWidget):
 
     def _draw_legend(self, p: QPainter, t: Theme) -> None:
         avail = self._available()
-        bar_h = 22
-        bar = QRectF(avail.left() + 2, avail.bottom() - bar_h, min(avail.width() - 4, 560), bar_h)
+        bar_h = self.LEGEND_H
+        bar = QRectF(avail.left() + 2, avail.bottom() - bar_h, avail.width() - 4, bar_h)
         p.setPen(QPen(QColor(t.line), 1))
         p.setBrush(QColor(t.panel))
         p.drawRect(bar)
         p.setBrush(Qt.NoBrush)
 
         font = QFont(t.mono)
-        font.setPixelSize(8)
+        font.setPixelSize(9)
         p.setFont(font)
-        x = bar.left() + 10
-        y = bar.center().y()
+        metrics = QFontMetrics(font)
         text_color = QColor(t.muted)
+        right = bar.right() - 10
+        x = bar.left() + 10
+        y = bar.top() + 14
 
-        # 结构边
-        p.setPen(QPen(QColor(t.edge_struct), 1))
-        p.drawLine(QPointF(x, y), QPointF(x + 18, y))
-        p.setPen(text_color)
-        p.drawText(QPointF(x + 23, y + 3), "结构边 · 双向")
-        x += 98
+        def draw_chip(icon, label: str) -> None:
+            nonlocal x
+            need = 24 + metrics.horizontalAdvance(label)
+            if x + need > right:
+                return
+            icon(x, y)
+            p.setPen(text_color)
+            p.drawText(QPointF(x + 24, y + 3), label)
+            x += need + 16
 
-        # 推荐箭头
-        p.setPen(QPen(QColor(t.edge_rec), 1.2))
-        p.drawLine(QPointF(x, y), QPointF(x + 15, y))
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(t.edge_rec))
-        p.drawPolygon(QPolygonF([
-            QPointF(x + 20, y),
-            QPointF(x + 14, y - 4),
-            QPointF(x + 14, y + 4),
-        ]))
-        p.setBrush(Qt.NoBrush)
-        p.setPen(text_color)
-        p.drawText(QPointF(x + 25, y + 3), "推荐箭头 · 单向")
-        x += 104
+        def icon_struct(px: float, py: float) -> None:
+            p.setPen(QPen(QColor(t.edge_struct), 1.2))
+            p.drawLine(QPointF(px, py), QPointF(px + 16, py))
 
-        # 环
-        ring = QRectF(x, y - 6, 12, 12)
-        pen = QPen(QColor(t.ring), 1, Qt.DashLine)
-        pen.setDashPattern([1, 2])
-        p.setPen(pen)
-        p.drawEllipse(ring)
-        p.setPen(text_color)
-        p.drawText(QPointF(x + 17, y + 3), "R1 / R2 两跳")
-        x += 92
+        def icon_rec(px: float, py: float) -> None:
+            p.setPen(QPen(QColor(t.edge_rec), 1.2))
+            p.drawLine(QPointF(px, py), QPointF(px + 15, py))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(t.edge_rec))
+            p.drawPolygon(QPolygonF([
+                QPointF(px + 20, py),
+                QPointF(px + 14, py - 4),
+                QPointF(px + 14, py + 4),
+            ]))
+            p.setBrush(Qt.NoBrush)
 
-        # 中心
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(t.center_fill))
-        p.drawEllipse(QPointF(x + 4, y), 3.5, 3.5)
-        p.setBrush(Qt.NoBrush)
-        p.setPen(text_color)
-        p.drawText(QPointF(x + 12, y + 3), "CENTER")
+        def icon_ring(px: float, py: float) -> None:
+            pen = QPen(QColor(t.ring), 1, Qt.DashLine)
+            pen.setDashPattern([1, 2])
+            p.setPen(pen)
+            p.drawEllipse(QRectF(px, py - 6, 12, 12))
+
+        def icon_center(px: float, py: float) -> None:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(t.center_fill))
+            p.drawEllipse(QPointF(px + 4, py), 3.5, 3.5)
+            p.setBrush(Qt.NoBrush)
+
+        draw_chip(icon_struct, "结构边：同目录，双向")
+        draw_chip(icon_rec, "推荐箭头：单向")
+        draw_chip(icon_ring, "R1 / R2 两跳")
+        draw_chip(icon_center, "CENTER")
+
+        # 箭头指代说明
+        p.setPen(QColor(t.text_dim))
+        p.drawText(QPointF(bar.left() + 10, bar.top() + 34),
+                   "箭头 = 推荐方向（推荐来源 → 被推荐文档）；灰线 = 同目录结构")
 
     def _draw_scale(self, p: QPainter, t: Theme) -> None:
         avail = self._available()
         font = QFont(t.mono)
-        font.setPixelSize(7)
+        font.setPixelSize(9)
         p.setFont(font)
         p.setPen(QColor(t.faint))
         text = "GRID 26 PX · 1:1"
         width = QFontMetrics(font).horizontalAdvance(text)
         x = avail.right() - width
-        y = avail.bottom() - 4
+        y = avail.bottom() - self.LEGEND_H - 8
         p.drawText(QPointF(x, y), text)
         p.setPen(QPen(QColor(t.ring), 1))
         tx = avail.right() - 6 * 14
-        ty = avail.bottom() - 12
+        ty = avail.bottom() - self.LEGEND_H - 16
         for i in range(6):
             h = 3 if i % 2 == 0 else 6
             p.drawLine(QPointF(tx + i * 14, ty), QPointF(tx + i * 14, ty + h))
@@ -376,7 +387,7 @@ class GraphViewWidget(QWidget):
         avail = self._available()
         text = f"{truncated} 个节点因该圈满 10 个被截去"
         font = QFont(t.mono)
-        font.setPixelSize(7)
+        font.setPixelSize(9)
         p.setFont(font)
         width = QFontMetrics(font).horizontalAdvance(text) + 14
         rect = QRectF(avail.right() - width - 2, avail.top() + 6, width, 20)
