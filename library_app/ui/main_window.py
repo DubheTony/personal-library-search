@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -232,17 +231,12 @@ class DocPanel(QFrame):
         bl.addWidget(self.text)
         lay.addWidget(body_wrap, 1)
 
-        self.shadow = QGraphicsDropShadowEffect(self)
-        self.shadow.setBlurRadius(46)
-        self.shadow.setOffset(-18, 0)
-        self.setGraphicsEffect(self.shadow)
+        # 不要在代理控件上用 QGraphicsDropShadowEffect：整页缩放时它会把
+        # 侧板右侧约 200 逻辑像素的绘制裁掉（100% 才正常）。分隔线由 QSS 负责。
         self.hide()
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
-        color = QColor(theme.shadow)
-        color.setAlpha(80 if not theme.is_dark else 150)
-        self.shadow.setColor(color)
 
     def set_content(self, doc: DocumentView, terms: list[str] | None, is_center: bool,
                     hits=None) -> None:
@@ -478,7 +472,7 @@ class MainWindow(QMainWindow):
 
         self.theme_key = "drafting"
         self.theme = THEMES[self.theme_key]
-        self.zoom = 1.20
+        self.zoom = 1.25
         self._zoom_initialized = False
         self.mode = "recommend"
         self.preset = "balanced"
@@ -505,17 +499,12 @@ class MainWindow(QMainWindow):
         screen = QApplication.primaryScreen()
         if screen is not None:
             avail = screen.availableGeometry()
-            # 大屏默认 120%，小屏默认 100%，避免一启动就出现滚动条。
-            if avail.width() < 1400 or avail.height() < 780:
-                self.zoom = 1.0
-            else:
-                self.zoom = 1.2
+            # 默认按 125% 显示；缩放只由用户手动调整。
             self.resize(
                 min(1560, max(1180, avail.width() - 20)),
                 min(960, max(680, avail.height() - 40)),
             )
         else:
-            self.zoom = 1.2
             self.resize(1440, 900)
         self._build()
         self._apply_theme(self.theme_key, first=True)
@@ -785,8 +774,48 @@ class MainWindow(QMainWindow):
         if self.doc_open and self.doc_id is not None:
             self._update_doc_panel()
         self.canvas.set_doc_open(self.doc_open)
+        self._sync_panel_visibility()
         self._update_status()
         self.doc_stat.setText(f"{self.summary.document_count} DOCS")
+
+    def _sync_panel_visibility(self) -> None:
+        """侧板打开时让预览完整出现在视口内，关闭时回到左上角。"""
+        if not hasattr(self, "view"):
+            return
+        if self.doc_open:
+            QTimer.singleShot(0, self._ensure_doc_panel_visible)
+        else:
+            self.view.scroll_home()
+
+    def _ensure_doc_panel_visible(self) -> None:
+        """放大后视口装不下整页，至少要把文档侧板推进可视范围。
+
+        横向滚到侧板右缘可见；纵向在侧板能完整放下时刚好露出底部，
+        放不下时优先露出顶部（标题和关闭按钮）。
+        """
+        panel = self.canvas.doc_panel
+        if not self.doc_open or not panel.isVisible():
+            return
+        if panel._anim.state() == QAbstractAnimation.Running:
+            QTimer.singleShot(300, self._ensure_doc_panel_visible)
+            return
+        view = self.view
+        vp = view.viewport().rect()
+        top_left = view.mapFromScene(panel.mapTo(self.root, panel.rect().topLeft()))
+        bottom_right = view.mapFromScene(panel.mapTo(self.root, panel.rect().bottomRight()))
+
+        hbar = view.horizontalScrollBar()
+        right_over = bottom_right.x() - (vp.width() - 1)
+        if right_over > 0:
+            hbar.setValue(min(hbar.maximum(), hbar.value() + right_over))
+
+        vbar = view.verticalScrollBar()
+        upper = top_left.y()  # 为保住顶部，最多只能向下滚这么多
+        lower = bottom_right.y() - (vp.height() - 1)
+        if upper < 0:
+            vbar.setValue(max(vbar.minimum(), vbar.value() + upper))
+        elif lower > 0:
+            vbar.setValue(min(vbar.maximum(), vbar.value() + min(lower, upper)))
 
     def _sync_rail(self) -> None:
         btn = self.rail_buttons.get(self.mode)
@@ -1546,6 +1575,7 @@ class MainWindow(QMainWindow):
     def close_doc(self) -> None:
         self.doc_open = False
         self.canvas.set_doc_open(False)
+        self._sync_panel_visibility()
 
     def recenter(self) -> None:
         if self.doc_id is None:
@@ -1568,6 +1598,7 @@ class MainWindow(QMainWindow):
         self.freq_algo = "top"
         self.doc_open = False
         self.canvas.set_doc_open(False)
+        self._sync_panel_visibility()
         self._sync_rail()
         self.panel_title.setText(TOOL_META[self.mode][0])
         self.panel_hint.setText(TOOL_META[self.mode][1])
@@ -1625,6 +1656,7 @@ class MainWindow(QMainWindow):
             self.zoom_control.set_value(percent)
         if self._zoom_initialized:
             self.toast.show_message(f"页面缩放 · {percent}%")
+        self._sync_panel_visibility()
 
     def _build_shortcuts(self) -> None:
         self._shortcuts: list[QShortcut] = []
@@ -1751,3 +1783,5 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "toast"):
             self.toast._position()
+        if hasattr(self, "view") and self.doc_open:
+            QTimer.singleShot(0, self._ensure_doc_panel_visible)

@@ -61,6 +61,14 @@ class ClickableCard(QFrame):
         self._repolish()
         super().leaveEvent(event)
 
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        # 在 QGraphicsProxyWidget 里，只有 accept 过 press 的控件才能收到 release，
+        # 默认 QWidget 会 ignore，所以卡片必须在按下时接住。
+        if event.button() == Qt.LeftButton:
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton and self.rect().contains(event.position().toPoint()):
             self.clicked.emit()
@@ -284,6 +292,13 @@ class ThemeSwitcher(QWidget):
                        Qt.AlignCenter, ["纸", "仪", "图"][i])
             p.setFont(font)
         p.end()
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        # 同 ClickableCard：不接住 press 就收不到 release，圆点点不动。
+        if event.button() == Qt.LeftButton:
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
         pos = event.position()

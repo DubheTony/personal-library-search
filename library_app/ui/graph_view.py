@@ -425,6 +425,14 @@ class GraphViewWidget(QWidget):
         self.update()
         super().leaveEvent(event)
 
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        # 在 QGraphicsProxyWidget 里，只有 accept 过 press 的控件才能收到 release，
+        # 不接住左键的话点节点没有任何反应。
+        if event.button() == Qt.LeftButton:
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton:
             nid = self._node_at(event.position())
