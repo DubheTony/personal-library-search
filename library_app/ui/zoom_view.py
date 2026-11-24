@@ -76,6 +76,10 @@ class ZoomView(QGraphicsView):
     def reset_zoom(self) -> None:
         self.set_zoom(1.0)
 
+    def scroll_home(self) -> None:
+        self.horizontalScrollBar().setValue(0)
+        self.verticalScrollBar().setValue(0)
+
     # ---------- 尺寸同步 ----------
     def _sync_size(self) -> None:
         """逻辑尺寸 = 视口 / 缩放；但不低于界面最小设计尺寸。
