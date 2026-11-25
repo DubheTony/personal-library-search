@@ -6,14 +6,14 @@ An offline document search and recommendation tool for Windows. It reads local M
 
 ## Screenshot
 
-![Recommendations, scores, reasons, and the two-hop graph (demo data)](screenshot.png)
+![Recommendation paths, clusters, and the two-hop graph (demo data)](screenshot.png)
 
 ## Features
 
 - Browse documents by directory.
-- Search full text with multiple keywords and see matching documents, locations, and context.
+- Search full text with multiple keywords and see matching documents, locations, and context; phrase search is also available.
 - Count word frequencies for a document or directory and compare the results of two sorting algorithms.
-- Recommend documents based on directory relationships, word frequencies in their text, and shared high-frequency words; show the contribution of each factor and a relationship graph.
+- Recommend documents based on directory relationships, word frequencies in their text, and shared high-frequency words; show each factor, association paths, document clusters, and a relationship graph.
 - Process documents locally without uploading them.
 
 ## Current status
@@ -33,7 +33,7 @@ On Windows, you can also double-click `运行.bat`.
 
 The interface prefers the real `LibraryService`. If there is no `样例资料库/` directory in the project root or the real service fails to load, it falls back to 20 built-in demo documents. The window title and the top bar mark “演示数据” (demo data) so you can try the interface immediately. Add real documents to `样例资料库/` to use the real backend automatically.
 
-The interface has three sections: directory, word frequency, and recommendations. Submitting the top search box opens a separate results view with snippets, hit positions, highlights, and document opening. The directory view shows a folder tree and the documents in the selected folder. The word-frequency view shows hash counts, the Top-K min-heap, and quick/merge sort timings and traces. The recommendation view shows the three score parts, weights, reasons, and a two-hop graph anchored at the current start document. Documents open in a separate reading view and can be set as the recommendation start. In the top-right corner, you can switch between the “纸质档案”, “观察台”, and “制图台” visual themes. The `− / percentage / +` controls at the top zoom the entire page from 85% to 150% (125% by default). You can also use `Ctrl + mouse wheel`, `Ctrl+=`, `Ctrl+-`, or `Ctrl+0`.
+The interface has three sections: directory, word frequency, and recommendations. The top search box supports word search and exact phrase search; submitting it opens a separate results view with snippets, hit positions, highlights, and document opening. The directory view shows a combined folder/document tree and animates a depth-first traversal on the right. The word-frequency view shows a hash-count grid, the Top-K min-heap, and block animations for quick/merge sort. The recommendation view shows the three score parts, weights, reasons, association paths, document clusters, and a two-hop graph anchored at the current start document. Documents open in a separate reading view with a collapsible directory and can be set as the recommendation start. In the top-right corner, you can switch between the “纸质档案”, “观察台”, and “制图台” visual themes. The `− / percentage / +` controls at the top zoom the entire page from 85% to 150% (125% by default). You can also use `Ctrl + mouse wheel`, `Ctrl+=`, `Ctrl+-`, or `Ctrl+0`.
 
 The sample document library remains excluded from the repository by `.gitignore`.
 

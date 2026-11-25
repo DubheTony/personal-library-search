@@ -9,7 +9,7 @@ import html
 import re
 from typing import Optional
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, QTimer, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -20,6 +20,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStackedWidget,
     QTextBrowser,
     QToolButton,
     QVBoxLayout,
@@ -37,6 +39,7 @@ from ..models import (
     DocumentView as DocModel,
     FrequencyReport,
     GraphView,
+    RecommendationItem,
     RecommendationView,
     SearchResult,
     TreeItem,
@@ -140,95 +143,21 @@ def _scroll_host(parent: QWidget) -> tuple[QScrollArea, QWidget, QVBoxLayout]:
     return scroll, host, lay
 
 
-class DirectoryView(QWidget):
-    def __init__(self, controller) -> None:
-        super().__init__()
+
+
+class DirectoryTree(QWidget):
+    """文件夹与文档合在同一棵树里；文件夹负责导航，文档打开阅读页。"""
+
+    def __init__(self, controller, parent=None) -> None:
+        super().__init__(parent)
         self.c = controller
-        self._theme: Theme = controller.theme
-        self._traversal_open = False
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self.scroll, self.host, self.tree_lay = _scroll_host(self)
+        lay.addWidget(self.scroll)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
-        self.header = ViewHeader("目录")
-        root.addWidget(self.header)
-
-        body = QWidget()
-        body_lay = QHBoxLayout(body)
-        body_lay.setContentsMargins(28, 16, 28, 22)
-        body_lay.setSpacing(22)
-        root.addWidget(body, 1)
-
-        # 左：文件夹树
-        left = QWidget()
-        left.setFixedWidth(330)
-        left_lay = QVBoxLayout(left)
-        left_lay.setContentsMargins(0, 0, 0, 0)
-        left_lay.setSpacing(8)
-
-        tree_head = QHBoxLayout()
-        tree_head.setContentsMargins(0, 0, 0, 0)
-        tree_head.setSpacing(8)
-        tree_title = QLabel("文件夹")
-        tree_title.setObjectName("SectionTitle")
-        self.traversal_btn = QPushButton("查看遍历顺序")
-        self.traversal_btn.setObjectName("LinkButton")
-        self.traversal_btn.setCursor(Qt.PointingHandCursor)
-        self.traversal_btn.setToolTip("查看目录树按深度优先展开的顺序")
-        self.traversal_btn.clicked.connect(self._toggle_traversal)
-        tree_head.addWidget(tree_title)
-        tree_head.addStretch(1)
-        tree_head.addWidget(self.traversal_btn)
-        left_lay.addLayout(tree_head)
-
-        self.tree_scroll, self.tree_host, self.tree_lay = _scroll_host(self)
-        left_lay.addWidget(self.tree_scroll, 1)
-
-        self.traversal = QFrame()
-        self.traversal.setObjectName("Card")
-        self.traversal.setFixedHeight(170)
-        traversal_outer = QVBoxLayout(self.traversal)
-        traversal_outer.setContentsMargins(10, 8, 10, 8)
-        traversal_outer.setSpacing(4)
-        t_title = QLabel("深度优先展开顺序")
-        t_title.setObjectName("Kicker")
-        traversal_outer.addWidget(t_title)
-        t_scroll, t_host, self.traversal_lay = _scroll_host(self)
-        traversal_outer.addWidget(t_scroll, 1)
-        self.traversal.hide()
-        left_lay.addWidget(self.traversal)
-
-        # 右：当前目录的文档
-        right = QWidget()
-        right_lay = QVBoxLayout(right)
-        right_lay.setContentsMargins(0, 0, 0, 0)
-        right_lay.setSpacing(6)
-        docs_head = QHBoxLayout()
-        docs_head.setContentsMargins(0, 0, 0, 0)
-        docs_head.setSpacing(8)
-        self.folder_title = QLabel("全部文档")
-        self.folder_title.setObjectName("SectionTitle")
-        self.folder_count = QLabel("")
-        self.folder_count.setObjectName("MonoMuted")
-        docs_head.addWidget(self.folder_title)
-        docs_head.addStretch(1)
-        docs_head.addWidget(self.folder_count)
-        right_lay.addLayout(docs_head)
-        self.docs_scroll, self.docs_host, self.docs_lay = _scroll_host(self)
-        right_lay.addWidget(self.docs_scroll, 1)
-
-        body_lay.addWidget(left)
-        body_lay.addWidget(right, 1)
-
-    # ---------- 构建 ----------
-    def refresh(self) -> None:
-        self._rebuild_tree()
-        self._rebuild_docs()
-        self._rebuild_traversal()
-        self.header.set_sub("按文件夹浏览")
-        self.traversal_btn.setText("收起遍历顺序" if self._traversal_open else "查看遍历顺序")
-
-    def _rebuild_tree(self) -> None:
+    def rebuild(self) -> None:
         clear_layout(self.tree_lay)
         root = ClickableCard("TreeRow")
         root.setProperty("kind", "folder")
@@ -245,111 +174,314 @@ class DirectoryView(QWidget):
         row.addWidget(name, 1)
         row.addWidget(count)
         root.setFixedHeight(26)
-        root.clicked.connect(lambda: self.c.select_folder(""))
+        root.clicked.connect(lambda: self.c.set_current_folder(""))
         self.tree_lay.addWidget(root)
 
         def walk(node: TreeItem, depth: int) -> None:
             for child in node.children:
-                if child.kind != "folder":
-                    continue
-                expanded = child.relative_path in self.c.expanded
-                card = ClickableCard("TreeRow")
-                card.setProperty("kind", "folder")
-                card.set_active(child.relative_path == self.c.folder)
-                lay = QHBoxLayout(card)
-                lay.setContentsMargins(6 + depth * 12, 0, 6, 0)
-                lay.setSpacing(5)
-                caret = QToolButton()
-                caret.setObjectName("Caret")
-                caret.setText("▾" if expanded else "▸")
-                caret.setFixedWidth(13)
-                caret.setCursor(Qt.PointingHandCursor)
-                caret.clicked.connect(
-                    lambda checked=False, p=child.relative_path: self.c.toggle_folder(p)
-                )
-                name = QLabel(child.name)
-                name.setObjectName("TreeName")
-                name.setToolTip(child.relative_path)
-                count = QLabel(str(self.c._folder_count(child)))
-                count.setObjectName("TreeCount")
-                name.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-                count.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-                lay.addWidget(caret)
-                lay.addWidget(name, 1)
-                lay.addWidget(count)
-                card.setFixedHeight(26)
-                card.clicked.connect(
-                    lambda p=child.relative_path: self.c.select_folder(p)
-                )
-                self.tree_lay.addWidget(card)
-                if expanded:
-                    walk(child, depth + 1)
+                if child.kind == "folder":
+                    expanded = child.relative_path in self.c.expanded
+                    card = ClickableCard("TreeRow")
+                    card.setProperty("kind", "folder")
+                    card.set_active(child.relative_path == self.c.folder)
+                    lay = QHBoxLayout(card)
+                    lay.setContentsMargins(6 + depth * 12, 0, 6, 0)
+                    lay.setSpacing(5)
+                    caret = QToolButton()
+                    caret.setObjectName("Caret")
+                    caret.setText("▾" if expanded else "▸")
+                    caret.setFixedWidth(13)
+                    caret.setCursor(Qt.PointingHandCursor)
+                    caret.clicked.connect(
+                        lambda checked=False, p=child.relative_path: self.c.toggle_folder(p)
+                    )
+                    name = QLabel(child.name)
+                    name.setObjectName("TreeName")
+                    name.setToolTip(child.relative_path)
+                    count = QLabel(str(self.c._folder_count(child)))
+                    count.setObjectName("TreeCount")
+                    name.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                    count.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                    lay.addWidget(caret)
+                    lay.addWidget(name, 1)
+                    lay.addWidget(count)
+                    card.setFixedHeight(26)
+                    card.clicked.connect(
+                        lambda p=child.relative_path: self.c.set_current_folder(p)
+                    )
+                    self.tree_lay.addWidget(card)
+                    if expanded:
+                        walk(child, depth + 1)
+                else:
+                    card = ClickableCard("TreeRow")
+                    card.setProperty("kind", "doc")
+                    card.set_active(child.doc_id == self.c.doc_id)
+                    lay = QHBoxLayout(card)
+                    lay.setContentsMargins(6 + depth * 12 + 13, 0, 6, 0)
+                    lay.setSpacing(5)
+                    dot = QLabel("•")
+                    dot.setObjectName("Dot")
+                    dot.setFixedWidth(7)
+                    name = QLabel(child.name)
+                    name.setObjectName("TreeName")
+                    name.setToolTip(child.relative_path)
+                    lay.addWidget(dot)
+                    lay.addWidget(name, 1)
+                    card.setFixedHeight(26)
+                    card.clicked.connect(
+                        lambda d=child.doc_id: self.c.open_doc(d)
+                    )
+                    dot.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                    name.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+                    self.tree_lay.addWidget(card)
 
         walk(self.c.tree_root, 0)
         self.tree_lay.addStretch(1)
 
-    def _rebuild_docs(self) -> None:
-        docs = self.c.service.list_folder(self.c.folder)
-        name = "全部文档" if self.c.folder == "" else self.c.folder.rsplit("/", 1)[-1]
-        self.folder_title.setText(name)
-        self.folder_count.setText(f"{len(docs)} 篇")
-        clear_layout(self.docs_lay)
-        if not docs:
-            empty = QLabel("这个目录里没有文档")
-            empty.setObjectName("Note")
-            hint = QLabel("换一个目录，或查看全部文档。")
-            hint.setObjectName("Note")
-            self.docs_lay.addWidget(empty)
-            self.docs_lay.addWidget(hint)
-            self.docs_lay.addStretch(1)
-            return
-        for doc in docs:
-            card = ClickableCard("DocRow")
-            lay = QVBoxLayout(card)
-            lay.setContentsMargins(6, 9, 6, 9)
-            lay.setSpacing(2)
-            title = QLabel(doc.title)
-            title.setObjectName("RowTitle")
-            path = QLabel(doc.relative_path)
-            path.setObjectName("RowPath")
-            lay.addWidget(title)
-            lay.addWidget(path)
-            card.set_active(doc.doc_id == self.c.doc_id)
-            card.clicked.connect(lambda d=doc.doc_id: self.c.open_doc(d))
-            card.make_children_transparent()
-            self.docs_lay.addWidget(card)
-        self.docs_lay.addStretch(1)
 
-    def _rebuild_traversal(self) -> None:
-        clear_layout(self.traversal_lay)
-        rows: list[tuple[str, int, int]] = []
+class TraversalAnim(QWidget):
+    """真实目录树上的深度优先遍历动画。"""
 
-        def walk(node: TreeItem, depth: int) -> None:
-            for child in node.children:
-                if child.kind == "folder":
-                    rows.append((child.relative_path, self.c._folder_count(child), depth))
-                    walk(child, depth + 1)
+    ROW_H = 22
+    changed = Signal(int)
+    playing_changed = Signal(bool)
 
-        walk(self.c.tree_root, 0)
-        if not rows:
-            label = QLabel("没有子目录")
-            label.setObjectName("Note")
-            self.traversal_lay.addWidget(label)
-        else:
-            for path, count, depth in rows:
-                row = QLabel(f"{'    ' * depth}{path} · {count} 篇")
-                row.setObjectName("AlgoLine")
-                row.setWordWrap(True)
-                self.traversal_lay.addWidget(row)
-        self.traversal_lay.addStretch(1)
-
-    def _toggle_traversal(self) -> None:
-        self._traversal_open = not self._traversal_open
-        self.traversal.setVisible(self._traversal_open)
-        self.traversal_btn.setText("收起遍历顺序" if self._traversal_open else "查看遍历顺序")
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._theme: Optional[Theme] = None
+        self._entries: list[tuple[str, str, int]] = []
+        self._index = 0
+        self._playing = False
+        self._timer = QTimer(self)
+        self._timer.setInterval(480)
+        self._timer.timeout.connect(self._tick)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
+        self.update()
+
+    def set_tree(self, root: TreeItem) -> None:
+        self._timer.stop()
+        self._playing = False
+        self._entries = [("folder", "全部文档", 0)]
+
+        def walk(node: TreeItem, depth: int) -> None:
+            for child in node.children:
+                self._entries.append((child.kind, child.name, depth))
+                if child.kind == "folder":
+                    walk(child, depth + 1)
+
+        walk(root, 1)
+        self._index = 0
+        self.setMinimumHeight(max(180, len(self._entries) * self.ROW_H + 16))
+        self.update()
+        self.changed.emit(0)
+        self.playing_changed.emit(False)
+
+    def current_index(self) -> int:
+        return self._index
+
+    def current_text(self) -> str:
+        if not self._entries:
+            return "没有可遍历的节点"
+        kind, name, _ = self._entries[self._index]
+        prefix = "目录" if kind == "folder" else "文档"
+        return f"第 {self._index + 1} / {len(self._entries)} 步 · {prefix} {name}"
+
+    def play(self) -> None:
+        if not self._entries:
+            return
+        if self._index >= len(self._entries) - 1:
+            self._index = 0
+            self.changed.emit(0)
+        self._playing = True
+        self._timer.start()
+        self.playing_changed.emit(True)
+        self.update()
+
+    def pause(self) -> None:
+        self._timer.stop()
+        self._playing = False
+        self.playing_changed.emit(False)
+        self.update()
+
+    def toggle(self) -> None:
+        if self._playing:
+            self.pause()
+        else:
+            self.play()
+
+    def step(self) -> None:
+        if not self._entries:
+            return
+        if self._index < len(self._entries) - 1:
+            self._index += 1
+            self.changed.emit(self._index)
+            self.update()
+        else:
+            self.pause()
+
+    def reset(self) -> None:
+        self._timer.stop()
+        self._playing = False
+        self._index = 0
+        self.changed.emit(0)
+        self.playing_changed.emit(False)
+        self.update()
+
+    def _tick(self) -> None:
+        if self._index >= len(self._entries) - 1:
+            self.pause()
+            return
+        self.step()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        theme = self._theme
+        if theme is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        font = QFont(theme.sans)
+        font.setPixelSize(10)
+        mono = QFont(theme.mono)
+        mono.setPixelSize(9)
+        for index, (kind, name, depth) in enumerate(self._entries):
+            y = 8 + index * self.ROW_H
+            if y > self.height():
+                break
+            current = index == self._index
+            visited = index < self._index
+            if current:
+                p.fillRect(QRectF(0, y - 3, self.width(), self.ROW_H), QColor(theme.accent_soft))
+                p.fillRect(QRectF(0, y - 3, 2, self.ROW_H), QColor(theme.accent))
+            color = QColor(
+                theme.text if current else (theme.text_dim if visited else theme.muted)
+            )
+            x = 10 + depth * 16
+            p.setFont(mono)
+            p.setPen(QColor(theme.faint))
+            p.drawText(
+                QRectF(x, y, 10, self.ROW_H),
+                Qt.AlignLeft | Qt.AlignVCenter,
+                "▸" if kind == "folder" else "•",
+            )
+            p.setFont(font)
+            p.setPen(color)
+            p.drawText(
+                QRectF(x + 12, y, max(20, self.width() - x - 20), self.ROW_H),
+                Qt.AlignLeft | Qt.AlignVCenter,
+                name,
+            )
+        p.end()
+
+
+class DirectoryView(QWidget):
+    def __init__(self, controller) -> None:
+        super().__init__()
+        self.c = controller
+        self._theme: Theme = controller.theme
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self.header = ViewHeader("目录")
+        self.header.set_sub("按文件夹浏览")
+        root.addWidget(self.header)
+
+        body = QWidget()
+        body_lay = QHBoxLayout(body)
+        body_lay.setContentsMargins(28, 16, 28, 22)
+        body_lay.setSpacing(20)
+        root.addWidget(body, 1)
+
+        left = QWidget()
+        left.setFixedWidth(380)
+        left_lay = QVBoxLayout(left)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(8)
+        tree_title = QLabel("文件夹")
+        tree_title.setObjectName("SectionTitle")
+        left_lay.addWidget(tree_title)
+        self.tree = DirectoryTree(self.c)
+        left_lay.addWidget(self.tree, 1)
+        body_lay.addWidget(left)
+
+        right = QFrame()
+        right.setObjectName("AlgoCard")
+        right_lay = QVBoxLayout(right)
+        right_lay.setContentsMargins(14, 12, 14, 12)
+        right_lay.setSpacing(6)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        anim_title = QLabel("深度优先遍历")
+        anim_title.setObjectName("SectionTitle")
+        self.traversal_label = QLabel("")
+        self.traversal_label.setObjectName("MonoMuted")
+        head.addWidget(anim_title)
+        head.addStretch(1)
+        head.addWidget(self.traversal_label)
+        right_lay.addLayout(head)
+
+        controls = QHBoxLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.setSpacing(6)
+        self.play_btn = QPushButton("播放")
+        self.play_btn.setObjectName("LinkButton")
+        self.play_btn.setCursor(Qt.PointingHandCursor)
+        self.next_btn = QPushButton("下一步")
+        self.next_btn.setObjectName("LinkButton")
+        self.next_btn.setCursor(Qt.PointingHandCursor)
+        self.reset_btn = QPushButton("重置")
+        self.reset_btn.setObjectName("LinkButton")
+        self.reset_btn.setCursor(Qt.PointingHandCursor)
+        controls.addWidget(self.play_btn)
+        controls.addWidget(self.next_btn)
+        controls.addWidget(self.reset_btn)
+        controls.addStretch(1)
+        right_lay.addLayout(controls)
+
+        self.traversal = TraversalAnim()
+        self.traversal_scroll = QScrollArea()
+        self.traversal_scroll.setWidgetResizable(True)
+        self.traversal_scroll.setFrameShape(QFrame.NoFrame)
+        self.traversal_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.traversal_scroll.setWidget(self.traversal)
+        right_lay.addWidget(self.traversal_scroll, 1)
+        body_lay.addWidget(right, 1)
+
+        self.play_btn.clicked.connect(self.traversal.toggle)
+        self.next_btn.clicked.connect(self.traversal.step)
+        self.reset_btn.clicked.connect(self.traversal.reset)
+        self.traversal.changed.connect(self._on_traversal_changed)
+        self.traversal.playing_changed.connect(self._on_traversal_playing)
+
+    def refresh(self) -> None:
+        self.tree.rebuild()
+        self.traversal.set_tree(self.c.tree_root)
+        self._on_traversal_changed(0)
+
+    def refresh_tree(self) -> None:
+        self.tree.rebuild()
+
+    def _on_traversal_changed(self, index: int) -> None:
+        self.traversal_label.setText(self.traversal.current_text())
+        QTimer.singleShot(0, self._scroll_to_current)
+
+    def _on_traversal_playing(self, playing: bool) -> None:
+        self.play_btn.setText("暂停" if playing else "播放")
+
+    def _scroll_to_current(self) -> None:
+        index = self.traversal.current_index()
+        y = 8 + index * self.traversal.ROW_H
+        bar = self.traversal_scroll.verticalScrollBar()
+        target = y - self.traversal_scroll.viewport().height() // 2
+        bar.setValue(max(0, min(bar.maximum(), target)))
+
+    def set_theme(self, theme: Theme) -> None:
+        self._theme = theme
+        self.traversal.set_theme(theme)
 
 
 class SearchView(QWidget):
@@ -387,12 +519,42 @@ class SearchView(QWidget):
         top_lay = QVBoxLayout(top)
         top_lay.setContentsMargins(28, 10, 28, 8)
         top_lay.setSpacing(6)
+
+        mode_row = QHBoxLayout()
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(4)
+        self.mode_buttons: dict[str, QPushButton] = {}
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.setExclusive(True)
+        for key, text in (("word", "按词检索"), ("phrase", "短语精确查找")):
+            button = QPushButton(text)
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(
+                lambda checked=False, value=key: self.c.set_search_mode(value)
+            )
+            self.mode_group.addButton(button)
+            self.mode_buttons[key] = button
+            mode_row.addWidget(button)
+        mode_row.addStretch(1)
+        top_lay.addLayout(mode_row)
+
+        query_row = QHBoxLayout()
+        query_row.setContentsMargins(0, 0, 0, 0)
+        query_row.setSpacing(8)
         self.query_label = QLabel("")
         self.query_label.setObjectName("ViewSub")
+        self.mode_label = QLabel("")
+        self.mode_label.setObjectName("Kicker")
+        query_row.addWidget(self.query_label)
+        query_row.addWidget(self.mode_label)
+        query_row.addStretch(1)
+        top_lay.addLayout(query_row)
+
         self.terms_lay = QHBoxLayout()
         self.terms_lay.setContentsMargins(0, 0, 0, 0)
         self.terms_lay.setSpacing(6)
-        top_lay.addWidget(self.query_label)
         top_lay.addLayout(self.terms_lay)
         root.addWidget(top)
 
@@ -407,36 +569,73 @@ class SearchView(QWidget):
     def show_results(self, query: str, results: list[SearchResult]) -> None:
         self._query = query
         self._results = results
+        mode = getattr(self.c, "search_mode", "word")
+        for key, button in self.mode_buttons.items():
+            button.setChecked(key == mode)
+        self.mode_label.setText("短语精确匹配" if mode == "phrase" else "按词检索")
         self.count.setText(f"{len(results)} 条结果")
-        self.query_label.setText(f"「{query}」" if query else "在顶部输入关键词后回车")
+        if query:
+            self.query_label.setText(f"「{query}」")
+        else:
+            self.query_label.setText(
+                "在顶部输入完整短语后回车"
+                if mode == "phrase"
+                else "在顶部输入关键词后回车"
+            )
         clear_layout(self.terms_lay)
-        tag = QLabel("倒排命中")
-        tag.setObjectName("Kicker")
-        self.terms_lay.addWidget(tag)
-        counts: dict[str, int] = {}
-        docs: dict[str, int] = {}
-        for result in results:
-            seen: set[str] = set()
-            for hit in result.hits:
-                counts[hit.word] = counts.get(hit.word, 0) + 1
-                seen.add(hit.word)
-            for word in seen:
-                docs[word] = docs.get(word, 0) + 1
-        for term in dict.fromkeys(query.split()):
-            chip = QLabel(f"{term} · {docs.get(term, 0)} 篇 / {counts.get(term, 0)} 处")
-            chip.setObjectName("Chips")
-            self.terms_lay.addWidget(chip)
+        if mode != "phrase":
+            tag = QLabel("倒排命中")
+            tag.setObjectName("Kicker")
+            self.terms_lay.addWidget(tag)
+        if mode == "phrase":
+            if query and results:
+                total_hits = sum(result.match_count for result in results)
+                chip = QLabel(f"{query} · {len(results)} 篇 / {total_hits} 处")
+                chip.setObjectName("Chips")
+                self.terms_lay.addWidget(chip)
+        else:
+            counts: dict[str, int] = {}
+            docs: dict[str, int] = {}
+            for result in results:
+                seen: set[str] = set()
+                for hit in result.hits:
+                    counts[hit.word] = counts.get(hit.word, 0) + 1
+                    seen.add(hit.word)
+                for word in seen:
+                    docs[word] = docs.get(word, 0) + 1
+            for term in dict.fromkeys(query.split()):
+                chip = QLabel(
+                    f"{term} · {docs.get(term, 0)} 篇 / {counts.get(term, 0)} 处"
+                )
+                chip.setObjectName("Chips")
+                self.terms_lay.addWidget(chip)
         self.terms_lay.addStretch(1)
 
         clear_layout(self.results_lay)
         if not results:
+            if not query:
+                self.results_lay.addStretch(1)
+                return
             self.results_lay.addSpacing(24)
-            empty = QLabel("没有找到同时包含这些词的文档")
-            empty.setObjectName("EmptyTitle")
-            self.results_lay.addWidget(empty)
-            hint = QLabel("减少关键词，或换一个词再试。")
-            hint.setObjectName("Note")
-            self.results_lay.addWidget(hint)
+            if mode == "phrase":
+                empty = QLabel("没有找到这个短语")
+                empty.setObjectName("EmptyTitle")
+                self.results_lay.addWidget(empty)
+                hint = QLabel("换一个短语再试，或改用按词检索。")
+                hint.setObjectName("Note")
+                self.results_lay.addWidget(hint)
+                switch = QPushButton("改用按词检索")
+                switch.setObjectName("LinkButton")
+                switch.setCursor(Qt.PointingHandCursor)
+                switch.clicked.connect(lambda: self.c.set_search_mode("word"))
+                self.results_lay.addWidget(switch)
+            else:
+                empty = QLabel("没有找到同时包含这些词的文档")
+                empty.setObjectName("EmptyTitle")
+                self.results_lay.addWidget(empty)
+                hint = QLabel("减少关键词，或换一个词再试。")
+                hint.setObjectName("Note")
+                self.results_lay.addWidget(hint)
             self.results_lay.addStretch(1)
             return
 
@@ -604,6 +803,329 @@ class HeapView(QWidget):
         p.end()
 
 
+
+
+class HashGrid(QWidget):
+    """哈希计数的图形化总览：每个小格是一个词，颜色深浅表示次数。"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._items: list[WordCount] = []
+        self._theme: Optional[Theme] = None
+        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_items(self, items: list[WordCount]) -> None:
+        self._items = list(items)
+        self.update()
+
+    def set_theme(self, theme: Theme) -> None:
+        self._theme = theme
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        theme = self._theme
+        if theme is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        if not self._items:
+            p.setPen(QColor(theme.muted))
+            p.setFont(QFont(theme.sans, 10))
+            p.drawText(self.rect(), Qt.AlignCenter, "暂无词频数据")
+            p.end()
+            return
+        max_count = max(item.count for item in self._items) or 1
+        columns = max(1, self.width() // 38)
+        rows = (len(self._items) + columns - 1) // columns
+        cell_w = self.width() / columns
+        cell_h = max(10.0, min(24.0, (self.height() - 4) / max(1, rows)))
+        font = QFont(theme.mono)
+        font.setPixelSize(8)
+        p.setFont(font)
+        for index, item in enumerate(self._items):
+            row, col = divmod(index, columns)
+            x = col * cell_w
+            y = row * cell_h
+            alpha = 24 + int(160 * min(1.0, item.count / max_count))
+            color = QColor(theme.accent)
+            color.setAlpha(alpha)
+            p.setPen(Qt.NoPen)
+            p.setBrush(color)
+            p.drawRoundedRect(
+                QRectF(x + 1, y + 1, max(4.0, cell_w - 2), max(4.0, cell_h - 2)),
+                theme.radius + 1,
+                theme.radius + 1,
+            )
+            if index < 12 and cell_h >= 14:
+                p.setPen(
+                    QColor(
+                        theme.on_accent
+                        if item.count / max_count > 0.55
+                        else theme.text_dim
+                    )
+                )
+                p.drawText(
+                    QRectF(x + 2, y, max(4.0, cell_w - 4), cell_h),
+                    Qt.AlignCenter,
+                    item.word,
+                )
+        p.end()
+
+
+class SortAnimWidget(QWidget):
+    """用方块步进演示排序过程，数据来自本次词频的前几个词。"""
+
+    changed = Signal(int)
+    playing_changed = Signal(bool)
+
+    def __init__(self, mode: str, parent=None) -> None:
+        super().__init__(parent)
+        self.mode = mode
+        self._theme: Optional[Theme] = None
+        self._items: list[tuple[str, int]] = []
+        self._steps: list[tuple[list[tuple[str, int]], set[int], set[int]]] = []
+        self._index = 0
+        self._playing = False
+        self._timer = QTimer(self)
+        self._timer.setInterval(560)
+        self._timer.timeout.connect(self._tick)
+        self.setMinimumHeight(260)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def set_theme(self, theme: Theme) -> None:
+        self._theme = theme
+        self.update()
+
+    def set_items(self, items: list[WordCount]) -> None:
+        self._items = [(item.word, item.count) for item in items]
+        self._steps = self._build_steps()
+        self._index = 0
+        self._timer.stop()
+        self._playing = False
+        self.update()
+        self.changed.emit(0)
+        self.playing_changed.emit(False)
+
+    def step_count(self) -> int:
+        return len(self._steps)
+
+    def current_index(self) -> int:
+        return self._index
+
+    @staticmethod
+    def _key(item: tuple[str, int]) -> tuple[int, str]:
+        return (-item[1], item[0])
+
+    def _build_steps(self):
+        if len(self._items) < 2:
+            return [(list(self._items), set(), set())]
+        array = sorted(self._items, key=lambda item: item[0])
+        steps: list[tuple[list[tuple[str, int]], set[int], set[int]]] = []
+        if self.mode == "quick":
+            self._quick(array, steps, 0, len(array) - 1)
+        else:
+            self._merge(array, steps)
+        if not steps:
+            steps.append((list(array), set(), set()))
+        steps.append((list(array), set(), set(range(len(array)))))
+        return steps
+
+    def _quick(self, array, steps, low: int, high: int) -> None:
+        if low >= high:
+            return
+        pivot = array[high]
+        store = low
+        for index in range(low, high):
+            if self._key(array[index]) < self._key(pivot):
+                array[store], array[index] = array[index], array[store]
+                steps.append((list(array), {store, index, high}, set()))
+                store += 1
+        array[store], array[high] = array[high], array[store]
+        steps.append((list(array), {store, high}, set()))
+        self._quick(array, steps, low, store - 1)
+        self._quick(array, steps, store + 1, high)
+
+    def _merge(self, array, steps) -> None:
+        width = 1
+        while width < len(array):
+            for low in range(0, len(array), 2 * width):
+                middle = min(low + width, len(array))
+                high = min(low + 2 * width, len(array))
+                array[low:high] = sorted(array[low:high], key=self._key)
+                steps.append((list(array), set(range(low, high)), set()))
+            width *= 2
+
+    def play(self) -> None:
+        if not self._steps:
+            return
+        if self._index >= len(self._steps) - 1:
+            self._index = 0
+            self.changed.emit(0)
+        self._playing = True
+        self._timer.start()
+        self.playing_changed.emit(True)
+        self.update()
+
+    def pause(self) -> None:
+        self._timer.stop()
+        self._playing = False
+        self.playing_changed.emit(False)
+        self.update()
+
+    def toggle(self) -> None:
+        if self._playing:
+            self.pause()
+        else:
+            self.play()
+
+    def step(self) -> None:
+        if not self._steps:
+            return
+        if self._index < len(self._steps) - 1:
+            self._index += 1
+            self.changed.emit(self._index)
+            self.update()
+        else:
+            self.pause()
+
+    def reset(self) -> None:
+        self._timer.stop()
+        self._playing = False
+        self._index = 0
+        self.changed.emit(0)
+        self.playing_changed.emit(False)
+        self.update()
+
+    def _tick(self) -> None:
+        if self._index >= len(self._steps) - 1:
+            self.pause()
+            return
+        self.step()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        theme = self._theme
+        if theme is None:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        if not self._steps:
+            p.setPen(QColor(theme.muted))
+            p.setFont(QFont(theme.sans, 10))
+            p.drawText(self.rect(), Qt.AlignCenter, "暂无词频数据")
+            p.end()
+            return
+        array, active, finished = self._steps[self._index]
+        count = len(array)
+        gap = 8.0
+        block_w = max(18.0, (self.width() - gap * (count + 1)) / max(1, count))
+        block_h = min(150.0, max(70.0, self.height() * 0.40))
+        top = (self.height() - block_h) / 2
+        font = QFont(theme.sans)
+        font.setPixelSize(10)
+        mono = QFont(theme.mono)
+        mono.setPixelSize(9)
+        for index, (word, value) in enumerate(array):
+            x = gap + index * (block_w + gap)
+            rect = QRectF(x, top, block_w, block_h)
+            if index in active:
+                fill = QColor(theme.accent)
+                border = QColor(theme.accent)
+                text_color = QColor(theme.on_accent)
+            elif index in finished:
+                fill = QColor(theme.accent_soft)
+                border = QColor(theme.signal)
+                text_color = QColor(theme.text)
+            else:
+                fill = QColor(theme.card)
+                border = QColor(theme.line)
+                text_color = QColor(theme.text)
+            p.setBrush(fill)
+            p.setPen(QPen(border, 1.2))
+            p.drawRoundedRect(rect, theme.radius + 2, theme.radius + 2)
+            p.setFont(font)
+            p.setPen(text_color)
+            label = word if len(word) <= 4 else word[:3] + "…"
+            p.drawText(
+                QRectF(x + 2, top + 8, block_w - 4, 18),
+                Qt.AlignCenter,
+                label,
+            )
+            p.setFont(mono)
+            p.setPen(text_color)
+            p.drawText(
+                QRectF(x + 2, top + block_h - 22, block_w - 4, 16),
+                Qt.AlignCenter,
+                str(value),
+            )
+        p.end()
+
+
+class SortPage(QFrame):
+    def __init__(self, title: str, mode: str, parent=None) -> None:
+        super().__init__(parent)
+        self.mode = mode
+        self.setObjectName("AlgoCard")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(4)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        title_label = QLabel(title)
+        title_label.setObjectName("SectionTitle")
+        head.addWidget(title_label)
+        head.addStretch(1)
+        lay.addLayout(head)
+        self.compare_label = QLabel("")
+        self.compare_label.setObjectName("AlgoLine")
+        self.compare_label.setWordWrap(True)
+        lay.addWidget(self.compare_label)
+        self.anim = SortAnimWidget(mode)
+        lay.addWidget(self.anim, 1)
+        controls = QHBoxLayout()
+        controls.setContentsMargins(0, 0, 0, 0)
+        controls.setSpacing(6)
+        self.play_btn = QPushButton("播放")
+        self.play_btn.setObjectName("LinkButton")
+        self.play_btn.setCursor(Qt.PointingHandCursor)
+        self.next_btn = QPushButton("下一步")
+        self.next_btn.setObjectName("LinkButton")
+        self.next_btn.setCursor(Qt.PointingHandCursor)
+        self.reset_btn = QPushButton("重置")
+        self.reset_btn.setObjectName("LinkButton")
+        self.reset_btn.setCursor(Qt.PointingHandCursor)
+        self.step_label = QLabel("")
+        self.step_label.setObjectName("MonoFaint")
+        controls.addWidget(self.play_btn)
+        controls.addWidget(self.next_btn)
+        controls.addWidget(self.reset_btn)
+        controls.addStretch(1)
+        controls.addWidget(self.step_label)
+        lay.addLayout(controls)
+        self.play_btn.clicked.connect(self.anim.toggle)
+        self.next_btn.clicked.connect(self.anim.step)
+        self.reset_btn.clicked.connect(self.anim.reset)
+        self.anim.changed.connect(self._on_changed)
+        self.anim.playing_changed.connect(self._on_playing)
+
+    def set_data(self, items: list[WordCount], quick_ms: float, merge_ms: float) -> None:
+        self.compare_label.setText(
+            f"本次前 8 个词：快速 {quick_ms:.2f} ms · 归并 {merge_ms:.2f} ms"
+        )
+        self.anim.set_items(items)
+
+    def set_theme(self, theme: Theme) -> None:
+        self.anim.set_theme(theme)
+
+    def _on_changed(self, index: int) -> None:
+        total = max(1, self.anim.step_count())
+        self.step_label.setText(f"第 {min(index + 1, total)} / {total} 步")
+
+    def _on_playing(self, playing: bool) -> None:
+        self.play_btn.setText("暂停" if playing else "播放")
+
+
 class FrequencyView(QWidget):
     def __init__(self, controller) -> None:
         super().__init__()
@@ -668,6 +1190,11 @@ class FrequencyView(QWidget):
         body_lay.setSpacing(18)
         root.addWidget(body, 1)
 
+        left = QWidget()
+        left_lay = QVBoxLayout(left)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(12)
+
         words_card = QFrame()
         words_card.setObjectName("AlgoCard")
         words_lay = QVBoxLayout(words_card)
@@ -678,67 +1205,51 @@ class FrequencyView(QWidget):
         words_lay.addWidget(words_title)
         self.words_scroll, self.words_host, self.words_lay = _scroll_host(self)
         words_lay.addWidget(self.words_scroll, 1)
-        body_lay.addWidget(words_card, 3)
-
-        right = QScrollArea()
-        right.setWidgetResizable(True)
-        right.setFrameShape(QFrame.NoFrame)
-        right.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        right_host = QWidget()
-        right_lay = QVBoxLayout(right_host)
-        right_lay.setContentsMargins(0, 0, 0, 0)
-        right_lay.setSpacing(12)
-        right.setWidget(right_host)
+        left_lay.addWidget(words_card, 1)
 
         hash_card = QFrame()
         hash_card.setObjectName("AlgoCard")
+        hash_card.setFixedHeight(215)
         hash_lay = QVBoxLayout(hash_card)
-        hash_lay.setContentsMargins(14, 12, 14, 12)
+        hash_lay.setContentsMargins(14, 10, 14, 10)
         hash_lay.setSpacing(4)
+        hash_head = QHBoxLayout()
+        hash_head.setContentsMargins(0, 0, 0, 0)
         hash_title = QLabel("哈希计数")
         hash_title.setObjectName("AlgoTitle")
-        self.hash_line = QLabel("")
-        self.hash_line.setObjectName("AlgoLine")
-        self.hash_line.setWordWrap(True)
-        hash_lay.addWidget(hash_title)
-        hash_lay.addWidget(self.hash_line)
-        right_lay.addWidget(hash_card)
+        self.hash_count = QLabel("")
+        self.hash_count.setObjectName("MonoMuted")
+        hash_head.addWidget(hash_title)
+        hash_head.addStretch(1)
+        hash_head.addWidget(self.hash_count)
+        hash_lay.addLayout(hash_head)
+        self.hash_grid = HashGrid()
+        hash_lay.addWidget(self.hash_grid, 1)
+        left_lay.addWidget(hash_card)
+        body_lay.addWidget(left, 3)
 
-        heap_card = QFrame()
-        heap_card.setObjectName("AlgoCard")
-        heap_lay = QVBoxLayout(heap_card)
+        self.algo_stack = QStackedWidget()
+        heap_page = QFrame()
+        heap_page.setObjectName("AlgoCard")
+        heap_lay = QVBoxLayout(heap_page)
         heap_lay.setContentsMargins(14, 12, 14, 12)
         heap_lay.setSpacing(4)
         heap_title = QLabel("Top-K 最小堆")
-        heap_title.setObjectName("AlgoTitle")
-        self.heap_caption = QLabel("堆顶是当前第 K 名；词频更高的词会替换它并向下调整。")
+        heap_title.setObjectName("SectionTitle")
+        self.heap_caption = QLabel("")
         self.heap_caption.setObjectName("AlgoLine")
         self.heap_caption.setWordWrap(True)
         self.heap_view = HeapView()
         heap_lay.addWidget(heap_title)
-        heap_lay.addWidget(self.heap_view)
+        heap_lay.addWidget(self.heap_view, 1)
         heap_lay.addWidget(self.heap_caption)
-        right_lay.addWidget(heap_card)
+        self.algo_stack.addWidget(heap_page)
 
-        sort_card = QFrame()
-        sort_card.setObjectName("AlgoCard")
-        sort_lay = QVBoxLayout(sort_card)
-        sort_lay.setContentsMargins(14, 12, 14, 12)
-        sort_lay.setSpacing(4)
-        sort_title = QLabel("快速排序 / 归并排序")
-        sort_title.setObjectName("AlgoTitle")
-        self.sort_line = QLabel("")
-        self.sort_line.setObjectName("AlgoLine")
-        self.sort_line.setWordWrap(True)
-        self.trace_label = QLabel("")
-        self.trace_label.setObjectName("AlgoStep")
-        self.trace_label.setWordWrap(True)
-        sort_lay.addWidget(sort_title)
-        sort_lay.addWidget(self.sort_line)
-        sort_lay.addWidget(self.trace_label)
-        right_lay.addWidget(sort_card)
-        right_lay.addStretch(1)
-        body_lay.addWidget(right, 2)
+        self.quick_page = SortPage("快速排序", "quick")
+        self.merge_page = SortPage("归并排序", "merge")
+        self.algo_stack.addWidget(self.quick_page)
+        self.algo_stack.addWidget(self.merge_page)
+        body_lay.addWidget(self.algo_stack, 2)
 
     def refresh(self) -> None:
         for key, button in self.scope_buttons.items():
@@ -747,6 +1258,8 @@ class FrequencyView(QWidget):
                 button.setEnabled(self.c.doc_id is not None)
         for key, button in self.algo_buttons.items():
             button.setChecked(key == self.c.freq_algo)
+        index = {"top": 0, "quick": 1, "merge": 2}.get(self.c.freq_algo, 0)
+        self.algo_stack.setCurrentIndex(index)
 
         report = self.c._ensure_freq()
         self._report = report
@@ -758,39 +1271,36 @@ class FrequencyView(QWidget):
             hint.setWordWrap(True)
             self.words_lay.addWidget(hint)
             self.words_lay.addStretch(1)
-            self.hash_line.setText("")
-            self.sort_line.setText("")
-            self.trace_label.setText("")
+            self.hash_count.setText("")
+            self.hash_grid.set_items([])
             self.heap_view.set_items([])
+            self.heap_caption.setText("")
+            self.quick_page.set_data([], 0.0, 0.0)
+            self.merge_page.set_data([], 0.0, 0.0)
             return
 
         scope = self.c._freq_scope_name()
         distinct = len(report.quick_sorted)
         tokens = sum(item.count for item in report.quick_sorted)
         self.header.set_sub(f"范围：{scope}")
-        example = report.quick_sorted[0] if report.quick_sorted else None
-        example_text = (
-            f"；例如 {example.word}→{example.count}" if example is not None else ""
-        )
-        self.hash_line.setText(
-            f"不同词 {distinct} 个，累计词次 {tokens}{example_text}。"
-        )
+        self.hash_count.setText(f"{distinct} 个词 · {tokens} 个词次")
+        self.hash_grid.set_items(report.quick_sorted)
 
         clear_layout(self.words_lay)
         max_count = max((item.count for item in report.top_k), default=1) or 1
-        for index, item in enumerate(report.top_k, start=1):
+        for position, item in enumerate(report.top_k, start=1):
             row = QWidget()
             row_lay = QHBoxLayout(row)
             row_lay.setContentsMargins(0, 2, 0, 2)
             row_lay.setSpacing(8)
-            rank = QLabel(f"{index:02d}")
+            rank = QLabel(f"{position:02d}")
             rank.setObjectName("MonoFaint")
             rank.setFixedWidth(20)
             word = QLabel(item.word)
             word.setObjectName("RowTitle")
             word.setFixedWidth(88)
             bar = QProgressBar()
-            bar.setObjectName("BarHot" if index <= 3 else "Bar")
+            bar.setObjectName("BarHot" if position <= 3 else "Bar")
             bar.setRange(0, max_count)
             bar.setValue(item.count)
             bar.setTextVisible(False)
@@ -812,80 +1322,19 @@ class FrequencyView(QWidget):
         heap_root = min(
             ((item.count, item.word) for item in report.top_k), default=None
         )
-        if heap_root is not None:
-            self.heap_caption.setText(
-                f"堆顶：{heap_root[1]}（{heap_root[0]} 次），是保留的 "
-                f"{len(report.top_k)} 个词里最低的。"
-            )
-
-        same = [(w.word, w.count) for w in report.quick_sorted] == [
-            (w.word, w.count) for w in report.merge_sorted
-        ]
-        equality = "两次排序结果一致" if same else "两次排序结果不一致"
-        self.sort_line.setText(
-            f"快速排序 {report.quick_ms:.2f} ms · 归并排序 {report.merge_ms:.2f} ms · {equality}"
+        self.heap_caption.setText(
+            f"堆顶：{heap_root[1]}（{heap_root[0]} 次）" if heap_root is not None else ""
         )
-        trace = self._trace_text(report)
-        self.trace_label.setText(trace)
-        self.trace_label.setVisible(bool(trace))
-
-    def _trace_text(self, report: FrequencyReport) -> str:
-        items = list(report.top_k[:8])
-        if len(items) < 2:
-            return ""
-        ordered = sorted(items, key=lambda item: item.word)
-        if self.c.freq_algo == "quick":
-            steps: list[str] = []
-            self._quick_steps(ordered, steps)
-            body = "\n".join(steps[:4])
-            return (
-                "步骤示意（本次 Top 8 词，输入按词名排列）：\n" + body
-            )
-        if self.c.freq_algo == "merge":
-            steps = self._merge_steps(ordered)
-            return (
-                "步骤示意（本次 Top 8 词，输入按词名排列）：\n" + "\n".join(steps[:4])
-            )
-        return ""
-
-    @staticmethod
-    def _quick_steps(items: list[WordCount], steps: list[str], depth: int = 0) -> None:
-        if len(items) <= 1 or len(steps) >= 4:
-            return
-        pivot = items[-1]
-        left = [item for item in items[:-1] if (item.count, item.word) > (pivot.count, pivot.word)]
-        right = [item for item in items[:-1] if (item.count, item.word) <= (pivot.count, pivot.word)]
-        steps.append(
-            f"基准 {pivot.word}（{pivot.count}）：左边 {len(left)} 项，右边 {len(right)} 项"
-        )
-        FrequencyView._quick_steps(left, steps, depth + 1)
-        FrequencyView._quick_steps(right, steps, depth + 1)
-
-    @staticmethod
-    def _merge_steps(items: list[WordCount]) -> list[str]:
-        runs = [[item] for item in items]
-        steps: list[str] = []
-        while len(runs) > 1 and len(steps) < 4:
-            merged_runs: list[list[WordCount]] = []
-            for index in range(0, len(runs), 2):
-                if index + 1 >= len(runs):
-                    merged_runs.append(runs[index])
-                    continue
-                left, right = runs[index], runs[index + 1]
-                merged = sorted(
-                    left + right, key=lambda item: (-item.count, item.word)
-                )
-                if len(steps) < 4:
-                    def fmt(run):
-                        return "、".join(f"{item.word}({item.count})" for item in run)
-                    steps.append(f"合并 [{fmt(left)}] + [{fmt(right)}] → [{fmt(merged)}]")
-                merged_runs.append(merged)
-            runs = merged_runs
-        return steps
+        demo_items = report.top_k[:8]
+        self.quick_page.set_data(demo_items, report.quick_ms, report.merge_ms)
+        self.merge_page.set_data(demo_items, report.quick_ms, report.merge_ms)
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
+        self.hash_grid.set_theme(theme)
         self.heap_view.set_theme(theme)
+        self.quick_page.set_theme(theme)
+        self.merge_page.set_theme(theme)
 
 
 class RecommendView(QWidget):
@@ -893,6 +1342,15 @@ class RecommendView(QWidget):
         super().__init__()
         self.c = controller
         self._theme: Theme = controller.theme
+        self._view: Optional[RecommendationView] = None
+        self._center_title = ""
+        self._selected_doc_id: Optional[int] = None
+        self._path_mode = "strength"
+        self._only_same = False
+        self._has_paths = False
+        self._has_clusters = False
+        self._items_by_id: dict[int, RecommendationItem] = {}
+        self._cards: dict[int, ClickableCard] = {}
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -913,7 +1371,11 @@ class RecommendView(QWidget):
         self.preset_group = QButtonGroup(self)
         self.preset_group.setExclusive(True)
         self.preset_buttons: dict[str, QPushButton] = {}
-        for key, text in (("balanced", "均衡"), ("structure", "结构优先"), ("content", "内容优先")):
+        for key, text in (
+            ("balanced", "均衡"),
+            ("structure", "结构优先"),
+            ("content", "内容优先"),
+        ):
             button = QPushButton(text)
             button.setObjectName("Segment")
             button.setCheckable(True)
@@ -925,6 +1387,13 @@ class RecommendView(QWidget):
             self.preset_buttons[key] = button
             preset_lay.addWidget(button)
         preset_lay.addStretch(1)
+        self.only_same = QCheckBox("只看同簇")
+        self.only_same.setObjectName("FilterCheck")
+        self.only_same.setCursor(Qt.PointingHandCursor)
+        self.only_same.toggled.connect(self._filter_changed)
+        self.only_same.hide()
+        preset_lay.addWidget(self.only_same)
+        preset_lay.addSpacing(12)
         self.weights = QLabel("")
         self.weights.setObjectName("MonoMuted")
         preset_lay.addWidget(self.weights)
@@ -944,6 +1413,46 @@ class RecommendView(QWidget):
         graph_lay = QVBoxLayout(graph_card)
         graph_lay.setContentsMargins(12, 10, 12, 12)
         graph_lay.setSpacing(4)
+
+        self.path_panel = QWidget()
+        path_lay = QVBoxLayout(self.path_panel)
+        path_lay.setContentsMargins(0, 0, 0, 6)
+        path_lay.setSpacing(4)
+        path_head = QHBoxLayout()
+        path_head.setContentsMargins(0, 0, 0, 0)
+        path_head.setSpacing(6)
+        path_title = QLabel("关联链")
+        path_title.setObjectName("AlgoTitle")
+        path_head.addWidget(path_title)
+        path_head.addStretch(1)
+        self.path_mode_group = QButtonGroup(self)
+        self.path_mode_group.setExclusive(True)
+        self.path_mode_buttons: dict[str, QPushButton] = {}
+        for key, text in (("hops", "最少跳数"), ("strength", "最强关联")):
+            button = QPushButton(text)
+            button.setObjectName("Segment")
+            button.setCheckable(True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(
+                lambda checked=False, value=key: self._set_path_mode(value)
+            )
+            self.path_mode_group.addButton(button)
+            self.path_mode_buttons[key] = button
+            path_head.addWidget(button)
+        path_lay.addLayout(path_head)
+        self.path_chain = QLabel("选择一条推荐查看关联链")
+        self.path_chain.setObjectName("PathChain")
+        self.path_chain.setTextFormat(Qt.PlainText)
+        self.path_chain.setWordWrap(True)
+        path_lay.addWidget(self.path_chain)
+        self.path_hint = QLabel("")
+        self.path_hint.setObjectName("Kicker")
+        self.path_hint.setWordWrap(True)
+        self.path_hint.hide()
+        path_lay.addWidget(self.path_hint)
+        self.path_panel.hide()
+        graph_lay.addWidget(self.path_panel)
+
         graph_title = QLabel("两跳关系")
         graph_title.setObjectName("SectionTitle")
         self.graph_sub = QLabel("")
@@ -957,24 +1466,74 @@ class RecommendView(QWidget):
         graph_lay.addWidget(self.graph, 1)
         body_lay.addWidget(graph_card, 2)
 
+    # ---------- 数据 ----------
     def set_data(
         self,
         view: Optional[RecommendationView],
         center_title: str,
         preset: str,
     ) -> None:
+        self._view = view
+        self._center_title = center_title
         for key, button in self.preset_buttons.items():
             button.setChecked(key == preset)
         wd, wc, wk = self.c.preset_weights[preset]
         self.weights.setText(f"权重：目录 {wd:.1f} · 正文 {wc:.1f} · 关键词 {wk:.1f}")
-        self.header.set_sub(f"起点：《{center_title}》" if center_title else "还没有推荐起点")
-        clear_layout(self.list_lay)
+
+        items = list(view.items) if view is not None else []
+        self._items_by_id = {item.doc_id: item for item in items}
+        self._has_paths = any(bool(getattr(item, "paths", None)) for item in items)
+        self._has_clusters = bool(
+            view is not None and getattr(view, "cluster_sizes", None)
+        )
+        self.only_same.setVisible(self._has_clusters)
+        if not self._has_clusters:
+            self.only_same.blockSignals(True)
+            self.only_same.setChecked(False)
+            self.only_same.blockSignals(False)
+            self._only_same = False
+        self.path_panel.setVisible(self._has_paths)
+        self.path_hint.hide()
+
+        subtitle = f"起点：《{center_title}》" if center_title else "还没有推荐起点"
+        if self._has_clusters and view is not None:
+            cluster_sizes = getattr(view, "cluster_sizes", {}) or {}
+            center_cluster = getattr(view, "center_cluster_id", None)
+            center_size = cluster_sizes.get(center_cluster, 0)
+            cross_count = sum(
+                1 for item in items if not getattr(item, "same_cluster", False)
+            )
+            subtitle += (
+                f" · 当前文档所在资料簇 {center_size} 篇 · "
+                f"跨簇推荐 {cross_count} 篇"
+            )
+        self.header.set_sub(subtitle)
+
+        if self._selected_doc_id not in self._items_by_id:
+            self._selected_doc_id = None
+
         if view is None:
+            clear_layout(self.list_lay)
             self.graph.set_graph(GraphView(nodes=[], edges=[]), "", "")
+            self.graph.set_highlight_path([])
             return
         self.graph.set_graph(view.graph, center_title, preset)
         self.graph.set_paths(self.c.paths)
-        if not view.items:
+        self._rebuild_list()
+        self._update_path_panel()
+
+    def _filtered_items(self):
+        items = list(self._view.items) if self._view is not None else []
+        if self._only_same:
+            items = [item for item in items if getattr(item, "same_cluster", False)]
+        return items
+
+    def _rebuild_list(self) -> None:
+        clear_layout(self.list_lay)
+        self._cards: dict[int, ClickableCard] = {}
+        if self._view is None:
+            return
+        if not self._view.items:
             empty = QLabel("没有其他文档可以推荐")
             empty.setObjectName("EmptyTitle")
             hint = QLabel("至少需要两篇文档。")
@@ -983,7 +1542,12 @@ class RecommendView(QWidget):
             self.list_lay.addWidget(hint)
             self.list_lay.addStretch(1)
             return
-        for index, item in enumerate(view.items, start=1):
+
+        visible_ids = set()
+        for index, item in enumerate(self._view.items, start=1):
+            if self._only_same and not getattr(item, "same_cluster", False):
+                continue
+            visible_ids.add(item.doc_id)
             card = ClickableCard("RecCard")
             lay = QHBoxLayout(card)
             lay.setContentsMargins(0, 10, 4, 10)
@@ -1001,14 +1565,31 @@ class RecommendView(QWidget):
             title = QLabel(item.title)
             title.setObjectName("RowTitle")
             title.setWordWrap(True)
+            top.addWidget(title, 1)
+            if self._has_clusters:
+                badge = QLabel(
+                    "同簇" if getattr(item, "same_cluster", False) else "跨簇"
+                )
+                badge.setObjectName("ClusterBadge")
+                top.addWidget(badge, 0, Qt.AlignTop)
             total = QLabel(f"{item.scores.total:.2f}")
             total.setObjectName("RecTotal")
-            top.addWidget(title, 1)
             top.addWidget(total, 0, Qt.AlignTop)
             body.addLayout(top)
+
+            path_row = QHBoxLayout()
+            path_row.setContentsMargins(0, 0, 0, 0)
+            path_row.setSpacing(6)
             path = QLabel(item.relative_path)
             path.setObjectName("RowPath")
-            body.addWidget(path)
+            open_btn = QPushButton("打开")
+            open_btn.setObjectName("LinkButton")
+            open_btn.setCursor(Qt.PointingHandCursor)
+            open_btn.clicked.connect(lambda d=item.doc_id: self.c.open_doc(d))
+            path_row.addWidget(path, 1)
+            path_row.addWidget(open_btn, 0)
+            body.addLayout(path_row)
+
             for label, value, meter in (
                 ("目录", item.scores.directory, "MeterD"),
                 ("正文", item.scores.content, "MeterC"),
@@ -1041,10 +1622,107 @@ class RecommendView(QWidget):
             body.addWidget(reason)
             lay.addWidget(rank)
             lay.addLayout(body, 1)
-            card.clicked.connect(lambda d=item.doc_id: self.c.open_doc(d))
+            card.set_active(item.doc_id == self._selected_doc_id)
+            card.clicked.connect(lambda d=item.doc_id: self._select_item(d))
             card.make_children_transparent()
+            open_btn.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+            self._cards[item.doc_id] = card
             self.list_lay.addWidget(card)
+
+        if self._selected_doc_id not in visible_ids:
+            self._selected_doc_id = None
+        if not visible_ids:
+            empty = QLabel("当前筛选下没有推荐")
+            empty.setObjectName("EmptyTitle")
+            hint = QLabel("取消“只看同簇”试试。")
+            hint.setObjectName("Note")
+            self.list_lay.addWidget(empty)
+            self.list_lay.addWidget(hint)
         self.list_lay.addStretch(1)
+
+    def _select_item(self, doc_id: int) -> None:
+        if doc_id not in self._items_by_id:
+            return
+        self._selected_doc_id = doc_id
+        for item_id, card in self._cards.items():
+            card.set_active(item_id == doc_id)
+        self._update_path_panel()
+
+    def _set_path_mode(self, mode: str) -> None:
+        if mode not in ("hops", "strength"):
+            return
+        self._path_mode = mode
+        self._update_path_panel()
+
+    def _update_path_panel(self) -> None:
+        for key, button in self.path_mode_buttons.items():
+            button.setChecked(key == self._path_mode)
+        if not self._has_paths:
+            self.path_panel.hide()
+            self.graph.set_highlight_path([])
+            return
+        self.path_panel.show()
+        item = self._items_by_id.get(self._selected_doc_id)
+        if item is None:
+            self.path_chain.setText("选择一条推荐查看关联链")
+            self.path_hint.hide()
+            self.graph.set_highlight_path([])
+            return
+
+        paths = getattr(item, "paths", {}) or {}
+        if not paths:
+            self.path_chain.setText("关联链不可用")
+            self.path_hint.hide()
+            self.graph.set_highlight_path([])
+            return
+        key = "dijkstra" if self._path_mode == "strength" else "bfs"
+        path = paths.get(key)
+        if path is None:
+            self.path_chain.setText("关联链不可用")
+            self.path_hint.hide()
+            self.graph.set_highlight_path([])
+            return
+        if not path.nodes:
+            self.path_chain.setText(
+                "无关联链，仅按内容相似推荐"
+                if self._path_mode == "strength"
+                else "两跳内不可达"
+            )
+            self.path_hint.hide()
+            self.graph.set_highlight_path([])
+            return
+
+        parts = [f"起点《{path.nodes[0].title}》"]
+        for segment, node in zip(path.segments, path.nodes[1:]):
+            parts.append(
+                f"→《{node.title}》（{segment.basis}，代价 {segment.cost:.2f}）"
+            )
+        chain = " ".join(parts)
+        chain += f"\n跳数 {path.hops} · 总代价 {path.total_cost:.2f}"
+        self.path_chain.setText(chain)
+
+        visible = (
+            {node.doc_id for node in self._view.graph.nodes}
+            if self._view is not None
+            else set()
+        )
+        hidden = any(node.doc_id not in visible for node in path.nodes)
+        hint = "图中虚线为这条关联链"
+        if self._has_clusters:
+            hint += "；节点数字为资料簇编号"
+        if hidden:
+            hint += "；不在当前两跳图中的节点只显示在文字里"
+        self.path_hint.setText(hint + "。")
+        self.path_hint.show()
+        self.graph.set_highlight_path([node.doc_id for node in path.nodes])
+
+    def _filter_changed(self, checked: bool) -> None:
+        self._only_same = bool(checked)
+        item = self._items_by_id.get(self._selected_doc_id)
+        if checked and item is not None and not getattr(item, "same_cluster", False):
+            self._selected_doc_id = None
+        self._rebuild_list()
+        self._update_path_panel()
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme
@@ -1060,6 +1738,7 @@ class DocumentView(QWidget):
         self._terms: Optional[list[str]] = None
         self._hits = None
         self._is_center = False
+        self._tree_collapsed = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -1098,8 +1777,40 @@ class DocumentView(QWidget):
 
         body = QWidget()
         body_lay = QHBoxLayout(body)
-        body_lay.setContentsMargins(24, 18, 24, 24)
-        body_lay.addStretch(1)
+        body_lay.setContentsMargins(0, 0, 24, 24)
+        body_lay.setSpacing(0)
+
+        self.tree_panel = QFrame()
+        self.tree_panel.setObjectName("DocTreePanel")
+        self.tree_panel.setFixedWidth(280)
+        tree_lay = QVBoxLayout(self.tree_panel)
+        tree_lay.setContentsMargins(10, 10, 10, 10)
+        tree_lay.setSpacing(6)
+        tree_head = QHBoxLayout()
+        tree_head.setContentsMargins(0, 0, 0, 0)
+        tree_head.setSpacing(6)
+        self.tree_title = QLabel("目录")
+        self.tree_title.setObjectName("Kicker")
+        self.tree_toggle = QPushButton("收起")
+        self.tree_toggle.setObjectName("LinkButton")
+        self.tree_toggle.setCursor(Qt.PointingHandCursor)
+        self.tree_toggle.clicked.connect(self._toggle_tree)
+        tree_head.addWidget(self.tree_title)
+        tree_head.addStretch(1)
+        tree_head.addWidget(self.tree_toggle)
+        tree_lay.addLayout(tree_head)
+        self.tree = DirectoryTree(self.c)
+        tree_lay.addWidget(self.tree, 1)
+        tree_lay.addStretch(1)
+        self._tree_layout = tree_lay
+        tree_lay.setStretch(1, 1)
+        tree_lay.setStretch(2, 0)
+        body_lay.addWidget(self.tree_panel)
+
+        reader = QWidget()
+        reader_lay = QHBoxLayout(reader)
+        reader_lay.setContentsMargins(24, 18, 0, 0)
+        reader_lay.addStretch(1)
         self.text = QTextBrowser()
         self.text.setObjectName("DocText")
         self.text.setFrameShape(QFrame.NoFrame)
@@ -1108,8 +1819,9 @@ class DocumentView(QWidget):
         self.text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.text.document().setDocumentMargin(0)
         self.text.setStyleSheet("QTextBrowser#DocText { padding: 0 24px; }")
-        body_lay.addWidget(self.text, 12)
-        body_lay.addStretch(1)
+        reader_lay.addWidget(self.text, 12)
+        reader_lay.addStretch(1)
+        body_lay.addWidget(reader, 1)
         root.addWidget(body, 1)
 
     def show_document(
@@ -1126,6 +1838,7 @@ class DocumentView(QWidget):
         self.path.setText(doc.relative_path)
         self.center_badge.setVisible(is_center)
         self.start_btn.setVisible(not is_center)
+        self.tree.rebuild()
         self._render()
 
     def _render(self) -> None:
@@ -1144,6 +1857,26 @@ class DocumentView(QWidget):
         cursor.setPosition(0)
         self.text.setTextCursor(cursor)
         self.text.verticalScrollBar().setValue(0)
+
+    def refresh_tree(self) -> None:
+        self.tree.rebuild()
+
+    def _toggle_tree(self) -> None:
+        self._tree_collapsed = not self._tree_collapsed
+        if self._tree_collapsed:
+            self.tree_panel.setFixedWidth(44)
+            self.tree_title.hide()
+            self.tree.hide()
+            self._tree_layout.setStretch(1, 0)
+            self._tree_layout.setStretch(2, 1)
+            self.tree_toggle.setText("目录")
+        else:
+            self.tree_panel.setFixedWidth(280)
+            self.tree_title.show()
+            self.tree.show()
+            self._tree_layout.setStretch(1, 1)
+            self._tree_layout.setStretch(2, 0)
+            self.tree_toggle.setText("收起")
 
     def set_theme(self, theme: Theme) -> None:
         self._theme = theme

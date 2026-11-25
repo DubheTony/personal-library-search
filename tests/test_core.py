@@ -8,7 +8,7 @@ from pathlib import Path
 
 from library_app.algorithms.searching import binary_search
 from library_app.algorithms.sorting import merge_sort, quick_sort
-from library_app.models import GraphEdge
+from library_app.models import GraphEdge, Span
 from library_app.relation_graph import RelationGraph
 from library_app.service import LibraryLoadError, LibraryService
 from library_app.structures.hash_table import HashTable
@@ -159,6 +159,70 @@ class ServiceIntegrationTests(unittest.TestCase):
         self.assertEqual(self.service.search("absent"), [])
         self.assertEqual(self.service.search("   "), [])
 
+    def test_phrase_search_across_punctuation_and_scattered_words(self) -> None:
+        (self.root / "A/two/ee.txt").write_text("alpha gamma beta", encoding="utf-8")
+        (self.root / "A/two/ff.txt").write_text("alpha，beta", encoding="utf-8")
+        (self.root / "A/two/gg.md").write_text(
+            "# Alpha Beta" + chr(10) + chr(10) + "plain", encoding="utf-8"
+        )
+        self.service.load()
+
+        word = self.service.search("alpha beta")
+        phrase = self.service.search("alpha beta", mode="phrase")
+        scattered = next(
+            result for result in word if result.relative_path.endswith("ee.txt")
+        )
+        self.assertNotIn(
+            scattered.doc_id, {result.doc_id for result in phrase}
+        )
+        phrase_paths = {result.relative_path for result in phrase}
+        self.assertEqual(len(phrase), 5)
+        self.assertTrue(
+            {
+                "A/one/aa.txt",
+                "A/one/bb.txt",
+                "B/one/dd.txt",
+                "A/two/ff.txt",
+                "A/two/gg.md",
+            }.issubset(phrase_paths)
+        )
+        self.assertNotIn("A/two/ee.txt", phrase_paths)
+
+        punctuated = next(
+            result for result in phrase if result.relative_path.endswith("ff.txt")
+        )
+        self.assertEqual(punctuated.match_count, 1)
+        self.assertEqual(punctuated.hits[0].span, Span(0, 10))
+        self.assertEqual(
+            self.service.get_document(punctuated.doc_id).body[0:10],
+            "alpha，beta",
+        )
+
+        title_only = next(
+            result for result in phrase if result.relative_path.endswith("gg.md")
+        )
+        self.assertTrue(all(hit.field == "title" for hit in title_only.hits))
+        self.assertEqual(title_only.snippet, "Alpha Beta")
+        self.assertEqual(self.service.search("", mode="phrase"), [])
+
+    def test_recommendation_paths_and_clusters(self) -> None:
+        view = self.service.recommend(0, "balanced")
+        self.assertTrue(view.cluster_sizes)
+        self.assertEqual(sum(view.cluster_sizes.values()), self.summary.document_count)
+        self.assertIn(view.center_cluster_id, view.cluster_sizes)
+        for item in view.items:
+            self.assertEqual(set(item.paths), {"bfs", "dijkstra"})
+            self.assertIsNotNone(item.cluster_id)
+            self.assertEqual(
+                item.same_cluster,
+                item.cluster_id == view.center_cluster_id,
+            )
+            for path in item.paths.values():
+                self.assertEqual(path.hops, len(path.segments))
+        structure = self.service.recommend(0, "structure")
+        self.assertEqual(sum(structure.cluster_sizes.values()), self.summary.document_count)
+        self.assertTrue(all(item.paths for item in structure.items))
+
     def test_frequency_two_sorts_and_top_k(self) -> None:
         report = self.service.analyze_frequency(doc_id=0, k=2)
         self.assertEqual(
@@ -242,6 +306,41 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(sum(node.hop == 2 for node in view.nodes), 0)
         self.assertTrue(all(edge.has_structure for edge in view.edges))
         self.assertTrue(all(edge.low_id < edge.high_id for edge in view.edges))
+
+    def test_paths_and_clusters(self) -> None:
+        documents = [
+            create_repository_document(0, "A/x/0.txt", "doc0"),
+            create_repository_document(1, "A/x/1.txt", "doc1"),
+            create_repository_document(2, "B/y/2.txt", "doc2"),
+            create_repository_document(3, "C/z/3.txt", "doc3"),
+        ]
+        scores = [
+            [0.0, 0.9, 0.1, 0.0],
+            [0.9, 0.0, 0.9, 0.0],
+            [0.1, 0.9, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0],
+        ]
+        top_three = [[2, 1], [2], [0, 1], []]
+        graph = RelationGraph()
+        graph.build(documents, scores, top_three)
+        self.assertEqual(graph.cluster_map(), {0: 0, 1: 0, 2: 0, 3: 1})
+        self.assertEqual(graph.cluster_sizes(), {0: 3, 1: 1})
+
+        paths = graph.paths(0, 2)
+        self.assertEqual([node.doc_id for node in paths["bfs"].nodes], [0, 2])
+        self.assertEqual(paths["bfs"].hops, 1)
+        self.assertEqual(
+            [node.doc_id for node in paths["dijkstra"].nodes], [0, 1, 2]
+        )
+        self.assertEqual(paths["dijkstra"].hops, 2)
+        self.assertLess(
+            paths["dijkstra"].total_cost, paths["bfs"].total_cost
+        )
+        self.assertTrue(all(segment.basis for segment in paths["dijkstra"].segments))
+
+        view = graph.extract(0)
+        self.assertEqual({node.doc_id for node in view.nodes}, {0, 1, 2})
+        self.assertTrue(all(node.cluster_id == 0 for node in view.nodes))
 
     def test_structure_and_recommendation_edges_merge(self) -> None:
         documents = [

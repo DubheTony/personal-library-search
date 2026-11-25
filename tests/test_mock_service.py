@@ -52,6 +52,14 @@ class MockServiceTest(unittest.TestCase):
                 self.assertLessEqual(span.end, len(result.snippet))
         no_hit = self.service.search("不存在的词组合xyz")
         self.assertEqual(no_hit, [])
+        phrase = self.service.search("检索 系统", mode="phrase")
+        self.assertTrue(phrase)
+        for result in phrase:
+            self.assertEqual(result.match_count, len(result.hits))
+            for span in result.snippet_spans:
+                self.assertGreaterEqual(span.start, 0)
+                self.assertLessEqual(span.end, len(result.snippet))
+        self.assertEqual(self.service.search("", mode="phrase"), [])
 
     def test_frequency(self) -> None:
         report = self.service.analyze_frequency(doc_id=5, k=10)
@@ -91,6 +99,17 @@ class MockServiceTest(unittest.TestCase):
             self.assertGreaterEqual(item.scores.total, 0.0)
             self.assertLessEqual(item.scores.total, 1.0)
             self.assertEqual(item.shared_keywords, sorted(item.shared_keywords))
+
+        self.assertTrue(view.cluster_sizes)
+        self.assertEqual(sum(view.cluster_sizes.values()), 20)
+        self.assertIn(view.center_cluster_id, view.cluster_sizes)
+        for item in view.items:
+            self.assertEqual(set(item.paths), {"bfs", "dijkstra"})
+            self.assertIsNotNone(item.cluster_id)
+            self.assertEqual(
+                item.same_cluster,
+                item.cluster_id == view.center_cluster_id,
+            )
 
         structure = self.service.recommend(5, "structure")
         self.assertEqual(structure.items[0].scores.directory, 1.0)

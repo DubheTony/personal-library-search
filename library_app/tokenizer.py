@@ -23,11 +23,13 @@ class Tokenizer:
                 words.add(word)
         return words
 
-    def tokenize(self, text: str) -> list[Token]:
+    def tokenize(self, text: str, keep_stopwords: bool = False) -> list[Token]:
         tokens: list[Token] = []
         for word, start, end in jieba.tokenize(text, mode="default"):
             normalized = word.casefold()
-            if not normalized.strip() or normalized in self._stopwords:
+            if not normalized.strip():
+                continue
+            if not keep_stopwords and normalized in self._stopwords:
                 continue
             if not any(character.isalnum() for character in normalized):
                 continue

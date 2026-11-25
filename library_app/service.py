@@ -82,10 +82,10 @@ class LibraryService:
         self._ensure_loaded()
         return self._repository.get_document(doc_id)  # type: ignore[union-attr]
 
-    def search(self, query: str) -> list[SearchResult]:
+    def search(self, query: str, mode: str = "word") -> list[SearchResult]:
         self._ensure_loaded()
         return self._search.search(  # type: ignore[union-attr]
-            query, self._tokenizer  # type: ignore[arg-type]
+            query, self._tokenizer, mode  # type: ignore[arg-type]
         )
 
     def analyze_frequency(

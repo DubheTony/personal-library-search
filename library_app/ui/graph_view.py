@@ -29,6 +29,7 @@ class GraphViewWidget(QWidget):
         self._node_radius = 18.0
         self._hover_id: int | None = None
         self._right_inset = 0
+        self._path_nodes: list[int] = []
         self.setMouseTracking(True)
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -53,10 +54,15 @@ class GraphViewWidget(QWidget):
         self._center_title = center_title
         self._preset_label = preset_label
         self._hover_id = None
+        self._path_nodes = []
         self.update()
 
     def set_paths(self, paths: dict[int, str]) -> None:
         self._paths = paths
+
+    def set_highlight_path(self, node_ids: list[int] | None) -> None:
+        self._path_nodes = list(node_ids or [])
+        self.update()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         return QSize(860, 620)
@@ -106,6 +112,7 @@ class GraphViewWidget(QWidget):
         self._draw_rings(p, t, center, r1, r2)
         if self._graph is not None:
             self._draw_edges(p, t, pos)
+            self._draw_path_edges(p, t, pos)
             self._draw_nodes(p, t, pos)
         else:
             self._draw_empty(p, t)
@@ -183,6 +190,30 @@ class GraphViewWidget(QWidget):
             if edge.high_to_low:
                 self._arrow(p, pb, pa, arrow_color)
 
+    def _draw_path_edges(
+        self, p: QPainter, t: Theme, pos: dict[int, QPointF]
+    ) -> None:
+        if len(self._path_nodes) < 2 or self._graph is None:
+            return
+        visible_edges = {
+            (min(edge.low_id, edge.high_id), max(edge.low_id, edge.high_id))
+            for edge in self._graph.edges
+        }
+        pen = QPen(QColor(t.text_dim), 2.2, Qt.DashLine)
+        pen.setDashPattern([5, 4])
+        pen.setCapStyle(Qt.RoundCap)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        for left_id, right_id in zip(self._path_nodes, self._path_nodes[1:]):
+            a, b = pos.get(left_id), pos.get(right_id)
+            if a is None or b is None:
+                continue
+            if (min(left_id, right_id), max(left_id, right_id)) not in visible_edges:
+                continue
+            pa = self._trim(a, b, self._node_radius + 5)
+            pb = self._trim(b, a, self._node_radius + 5)
+            p.drawLine(pa, pb)
+
     @staticmethod
     def _trim(a: QPointF, b: QPointF, pad: float) -> QPointF:
         dx, dy = b.x() - a.x(), b.y() - a.y()
@@ -212,6 +243,16 @@ class GraphViewWidget(QWidget):
         center_font = QFont(t.serif)
         center_font.setPixelSize(13)
         center_font.setBold(True)
+        cluster_palette = [
+            t.meter_d,
+            t.meter_c,
+            t.meter_k,
+            t.signal,
+            t.accent,
+            t.edge_struct,
+        ]
+        cluster_font = QFont(t.mono)
+        cluster_font.setPixelSize(9)
 
         for node in self._graph.nodes:
             ppos = pos.get(node.doc_id)
@@ -222,11 +263,25 @@ class GraphViewWidget(QWidget):
             hover = self._hover_id == node.doc_id
             fill = QColor(t.center_fill if is_center else t.node_fill)
             stroke = QColor(t.center_fill if is_center else t.node_stroke)
+            cluster_id = getattr(node, "cluster_id", None)
+            if cluster_id is not None:
+                stroke = QColor(cluster_palette[cluster_id % len(cluster_palette)])
             if hover:
                 stroke = QColor(t.signal)
+            if node.doc_id in self._path_nodes:
+                stroke = QColor(t.accent)
             p.setBrush(fill)
-            p.setPen(QPen(stroke, 2.0 if hover else 1.1))
+            p.setPen(QPen(stroke, 2.5 if node.doc_id in self._path_nodes else (2.0 if hover else 1.2)))
             p.drawEllipse(ppos, radius, radius)
+
+            if cluster_id is not None:
+                p.setFont(cluster_font)
+                p.setPen(QColor(t.center_id if is_center else t.node_id))
+                p.drawText(
+                    QRectF(ppos.x() - radius, ppos.y() - radius, radius * 2, radius * 2),
+                    Qt.AlignCenter,
+                    str(cluster_id + 1),
+                )
 
             if self._right_inset == 0 or is_center:
                 self._draw_node_label(p, t, node, ppos, is_center, label_font, center_font)
@@ -454,6 +509,9 @@ class GraphViewWidget(QWidget):
                 path = self._paths.get(nid, "")
                 hop_label = "起点" if node.hop == 0 else f"{node.hop} 跳"
                 tip = f"{node.title}\n{hop_label}"
+                cluster_id = getattr(node, "cluster_id", None)
+                if cluster_id is not None:
+                    tip += f"\n资料簇 {cluster_id + 1}"
                 if path:
                     tip += f"\n{path}"
                 QToolTip.showText(event.globalPosition().toPoint(), tip, self)

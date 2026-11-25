@@ -441,6 +441,11 @@ QLabel#AlgoTitle { font-family: "$mono"; font-size: 11px; color: $text_dim; }
 QLabel#AlgoLine { font-family: "$mono"; font-size: 10px; color: $muted; }
 QLabel#AlgoStep { font-family: "$mono"; font-size: 10px; color: $text_dim; }
 QFrame#DocBar { background: $panel_alt; border-bottom: 1px solid $line; }
+QFrame#RecCard[active="true"] { background: $card_hover; border-left: 2px solid $accent; }
+QLabel#ClusterBadge { font-family: "$mono"; font-size: 10px; color: $muted; border: 1px solid $line; border-radius: $radius; padding: 1px 5px; }
+QLabel#PathChain { font-size: 11px; color: $text_dim; }
+QCheckBox#FilterCheck { font-size: 11px; color: $muted; spacing: 4px; }
+QFrame#DocTreePanel { background: $panel_alt; border-right: 1px solid $line; }
     """
 )
 

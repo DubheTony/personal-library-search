@@ -100,6 +100,28 @@ class ScoreParts:
 
 
 @dataclass(frozen=True)
+class PathNode:
+    doc_id: int
+    title: str
+
+
+@dataclass(frozen=True)
+class PathSegment:
+    source_id: int
+    target_id: int
+    basis: str
+    cost: float
+
+
+@dataclass(frozen=True)
+class AssocPath:
+    nodes: list[PathNode]
+    segments: list[PathSegment]
+    total_cost: float
+    hops: int
+
+
+@dataclass(frozen=True)
 class RecommendationItem:
     doc_id: int
     title: str
@@ -107,6 +129,9 @@ class RecommendationItem:
     scores: ScoreParts
     shared_keywords: list[str]
     reason: str
+    paths: dict[str, AssocPath] = field(default_factory=dict)
+    cluster_id: int | None = None
+    same_cluster: bool = False
 
 
 @dataclass(frozen=True)
@@ -114,6 +139,7 @@ class GraphNode:
     doc_id: int
     title: str
     hop: int
+    cluster_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -135,3 +161,5 @@ class GraphView:
 class RecommendationView:
     items: list[RecommendationItem]
     graph: GraphView
+    cluster_sizes: dict[int, int] = field(default_factory=dict)
+    center_cluster_id: int | None = None

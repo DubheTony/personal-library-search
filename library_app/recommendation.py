@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .algorithms.sorting import merge_sort
 from .models import (
@@ -123,7 +123,23 @@ class RecommendationEngine:
         self._graph.build(self._documents, scores, top_three)
         items = select_top_k(all_items, limit, self._item_better)
         items = merge_sort(items, self._item_before)
-        return RecommendationView(items=items, graph=self._graph.extract(doc_id))
+        clusters = self._graph.cluster_map()
+        center_cluster = clusters.get(doc_id)
+        enriched = [
+            replace(
+                item,
+                paths=self._graph.paths(doc_id, item.doc_id),
+                cluster_id=clusters.get(item.doc_id),
+                same_cluster=clusters.get(item.doc_id) == center_cluster,
+            )
+            for item in items
+        ]
+        return RecommendationView(
+            items=enriched,
+            graph=self._graph.extract(doc_id),
+            cluster_sizes=self._graph.cluster_sizes(),
+            center_cluster_id=center_cluster,
+        )
 
     def _find_top_word_ids(self, vector: list[int]) -> list[int]:
         entries = [

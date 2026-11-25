@@ -30,7 +30,12 @@ class SearchEngine:
             self._add_tokens(document, document.title_tokens, "title")
             self._add_tokens(document, document.body_tokens, "body")
 
-    def search(self, query: str, tokenizer: Tokenizer) -> list[SearchResult]:
+    def search(
+        self, query: str, tokenizer: Tokenizer, mode: str = "word"
+    ) -> list[SearchResult]:
+        if mode == "phrase":
+            return self._search_phrase(query, tokenizer)
+
         words: list[str] = []
         for token in tokenizer.tokenize(query):
             if token.word not in words:
@@ -81,6 +86,58 @@ class SearchEngine:
                     )
                 )
         return results
+
+    def _search_phrase(
+        self, query: str, tokenizer: Tokenizer
+    ) -> list[SearchResult]:
+        query_tokens = [
+            token.word
+            for token in tokenizer.tokenize(query, keep_stopwords=True)
+        ]
+        if not query_tokens:
+            return []
+        results: list[SearchResult] = []
+        for document in self._documents:
+            title_tokens = tokenizer.tokenize(document.title, keep_stopwords=True)
+            body_tokens = tokenizer.tokenize(document.body, keep_stopwords=True)
+            hits = self._phrase_hits(
+                query.strip(), title_tokens, "title", query_tokens
+            )
+            hits.extend(
+                self._phrase_hits(query.strip(), body_tokens, "body", query_tokens)
+            )
+            if not hits:
+                continue
+            hits = merge_sort(hits, self._hit_before)
+            snippet, snippet_spans = self._make_snippet(document, hits)
+            results.append(
+                SearchResult(
+                    doc_id=document.doc_id,
+                    title=document.title,
+                    relative_path=document.relative_path,
+                    match_count=len(hits),
+                    hits=hits,
+                    snippet=snippet,
+                    snippet_spans=snippet_spans,
+                )
+            )
+        return results
+
+    @staticmethod
+    def _phrase_hits(
+        phrase: str, tokens: list[Token], field_name: str, query_tokens: list[str]
+    ) -> list[SearchHit]:
+        hits: list[SearchHit] = []
+        window = len(query_tokens)
+        for index in range(len(tokens) - window + 1):
+            if all(
+                tokens[index + offset].word == query_tokens[offset]
+                for offset in range(window)
+            ):
+                start = tokens[index].start
+                end = tokens[index + window - 1].end
+                hits.append(SearchHit(phrase, field_name, Span(start, end)))
+        return hits
 
     def _add_tokens(
         self, document: Document, tokens: list[Token], field_name: str

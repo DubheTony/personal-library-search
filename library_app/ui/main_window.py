@@ -83,6 +83,7 @@ class MainWindow(QMainWindow):
         )
         self.center_id = self.doc_id
         self.query = ""
+        self.search_mode = "word"
         self.results: list[SearchResult] = []
         self.selected_result_id: Optional[int] = None
         self.highlight_terms: Optional[list[str]] = None
@@ -408,7 +409,11 @@ class MainWindow(QMainWindow):
         elif self._search_return_view is None:
             self._search_return_view = self.directory_view
         self.query = self.search_input.text().strip()
-        self.results = self.service.search(self.query) if self.query else []
+        self.results = (
+            self.service.search(self.query, mode=self.search_mode)
+            if self.query
+            else []
+        )
         self.selected_result_id = None
         self.highlight_terms = None
         self.doc_open = False
@@ -416,6 +421,18 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.search_view)
         self._uncheck_rail()
         self._update_status()
+
+    def set_search_mode(self, mode: str) -> None:
+        if mode not in ("word", "phrase"):
+            return
+        self.search_mode = mode
+        self.search_input.setPlaceholderText(
+            "输入完整短语" if mode == "phrase" else "输入关键词，空格分隔"
+        )
+        if self.search_input.text().strip():
+            self.perform_search()
+        else:
+            self.search_view.show_results("", [])
 
     def close_search(self) -> None:
         target = self._search_return_view or self.directory_view
@@ -457,6 +474,8 @@ class MainWindow(QMainWindow):
         target = self._doc_return_view or self.directory_view
         self.workspace.setCurrentWidget(target)
         self.doc_open = False
+        if target is self.directory_view:
+            self.directory_view.refresh_tree()
         self._check_rail_for_view(target)
         self._update_status()
 
@@ -501,20 +520,21 @@ class MainWindow(QMainWindow):
         self._refresh_recommend()
         self._update_status()
 
-    def select_folder(self, path: str) -> None:
+    def set_current_folder(self, path: str) -> None:
         self.folder = path
-        self.mode = "folder"
-        self._check_rail("folder")
-        self.directory_view.refresh()
-        self.workspace.setCurrentWidget(self.directory_view)
-        self._update_status()
+        self.directory_view.refresh_tree()
+        self.document_view.refresh_tree()
+
+    def select_folder(self, path: str) -> None:
+        self.set_current_folder(path)
 
     def toggle_folder(self, path: str) -> None:
         if path in self.expanded:
             self.expanded.remove(path)
         else:
             self.expanded.add(path)
-        self.directory_view.refresh()
+        self.directory_view.refresh_tree()
+        self.document_view.refresh_tree()
 
     def _folder_count(self, node: TreeItem) -> int:
         if node.kind == "document":
