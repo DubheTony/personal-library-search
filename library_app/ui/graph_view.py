@@ -16,7 +16,7 @@ from ..theme import Theme
 
 class GraphViewWidget(QWidget):
     node_clicked = Signal(int)
-    LEGEND_H = 44
+    LEGEND_H = 30
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -63,7 +63,7 @@ class GraphViewWidget(QWidget):
 
     # ---------- 布局 ----------
     def _available(self) -> QRectF:
-        return QRectF(self.rect()).adjusted(24, 14, -24 - self._right_inset, -34)
+        return QRectF(self.rect()).adjusted(26, 18, -26 - self._right_inset, -self.LEGEND_H - 12)
 
     def _layout(self) -> tuple[dict[int, QPointF], float, float, QPointF]:
         graph = self._graph
@@ -98,22 +98,18 @@ class GraphViewWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.fillRect(self.rect(), QColor(t.canvas))
-        self._draw_grid(p, t)
 
         pos, r1, r2, center = self._layout()
         self._positions = pos
-        self._node_radius = 18.0 if self.width() > 560 else 16.0
+        self._node_radius = 18.0 if self.width() > 480 else 16.0
 
-        self._draw_crop_marks(p, t)
-        self._draw_axes(p, t, center)
         self._draw_rings(p, t, center, r1, r2)
         if self._graph is not None:
             self._draw_edges(p, t, pos)
             self._draw_nodes(p, t, pos)
         else:
             self._draw_empty(p, t)
-        self._draw_legend(p, t)
-        self._draw_scale(p, t)
+        self._draw_legend_compact(p, t)
         self._draw_truncated(p, t)
         p.end()
 
@@ -216,8 +212,6 @@ class GraphViewWidget(QWidget):
         center_font = QFont(t.serif)
         center_font.setPixelSize(13)
         center_font.setBold(True)
-        id_font = QFont(t.mono)
-        id_font.setPixelSize(11)
 
         for node in self._graph.nodes:
             ppos = pos.get(node.doc_id)
@@ -233,11 +227,6 @@ class GraphViewWidget(QWidget):
             p.setBrush(fill)
             p.setPen(QPen(stroke, 2.0 if hover else 1.1))
             p.drawEllipse(ppos, radius, radius)
-
-            p.setFont(id_font)
-            p.setPen(QColor(t.center_id if is_center else t.node_id))
-            p.drawText(QRectF(ppos.x() - radius, ppos.y() - radius, radius * 2, radius * 2),
-                       Qt.AlignCenter, str(node.doc_id).zfill(2))
 
             if self._right_inset == 0 or is_center:
                 self._draw_node_label(p, t, node, ppos, is_center, label_font, center_font)
@@ -360,6 +349,48 @@ class GraphViewWidget(QWidget):
         p.drawText(QPointF(bar.left() + 10, bar.top() + 34),
                    "箭头 = 推荐方向（来源 → 被推荐文档）；灰线 = 同目录结构")
 
+    def _draw_legend_compact(self, p: QPainter, t: Theme) -> None:
+        """一行图例：只解释线、箭头和两圈，不重复标题和状态。"""
+        avail = self._available()
+        y = avail.bottom() + 18
+        p.setPen(QPen(QColor(t.line_soft), 1))
+        p.drawLine(QPointF(avail.left(), avail.bottom() + 5),
+                   QPointF(avail.right(), avail.bottom() + 5))
+
+        font = QFont(t.mono)
+        font.setPixelSize(10)
+        p.setFont(font)
+        metrics = QFontMetrics(font)
+        text_color = QColor(t.muted)
+        x = avail.left()
+
+        p.setPen(QPen(QColor(t.edge_struct), 1.2))
+        p.drawLine(QPointF(x, y), QPointF(x + 16, y))
+        p.setPen(text_color)
+        p.drawText(QPointF(x + 22, y + 3), "同目录结构")
+        x += 22 + metrics.horizontalAdvance("同目录结构") + 18
+
+        p.setPen(QPen(QColor(t.edge_rec), 1.2))
+        p.drawLine(QPointF(x, y), QPointF(x + 15, y))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(t.edge_rec))
+        p.drawPolygon(QPolygonF([
+            QPointF(x + 20, y),
+            QPointF(x + 14, y - 4),
+            QPointF(x + 14, y + 4),
+        ]))
+        p.setBrush(Qt.NoBrush)
+        p.setPen(text_color)
+        p.drawText(QPointF(x + 25, y + 3), "推荐方向（来源 → 被推荐）")
+        x += 25 + metrics.horizontalAdvance("推荐方向（来源 → 被推荐）") + 18
+
+        pen = QPen(QColor(t.ring), 1, Qt.DashLine)
+        pen.setDashPattern([1, 2])
+        p.setPen(pen)
+        p.drawEllipse(QRectF(x, y - 5, 10, 10))
+        p.setPen(text_color)
+        p.drawText(QPointF(x + 16, y + 3), "内圈一跳，外圈两跳")
+
     def _draw_scale(self, p: QPainter, t: Theme) -> None:
         avail = self._available()
         font = QFont(t.mono)
@@ -385,7 +416,7 @@ class GraphViewWidget(QWidget):
         if truncated <= 0:
             return
         avail = self._available()
-        text = f"{truncated} 个节点因该圈满 10 个被截去"
+        text = f"本圈还有 {truncated} 篇未显示"
         font = QFont(t.mono)
         font.setPixelSize(10)
         p.setFont(font)
@@ -421,7 +452,8 @@ class GraphViewWidget(QWidget):
             node = next((n for n in self._graph.nodes if n.doc_id == nid), None)
             if node is not None:
                 path = self._paths.get(nid, "")
-                tip = f"{node.title}\n#{node.doc_id:02d} · 第 {node.hop} 跳"
+                hop_label = "起点" if node.hop == 0 else f"{node.hop} 跳"
+                tip = f"{node.title}\n{hop_label}"
                 if path:
                     tip += f"\n{path}"
                 QToolTip.showText(event.globalPosition().toPoint(), tip, self)

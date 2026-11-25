@@ -80,7 +80,7 @@ class ClickableCard(QFrame):
 
 
 class RailButton(QAbstractButton):
-    def __init__(self, mode: str, text: str, index: str, parent=None) -> None:
+    def __init__(self, mode: str, text: str, index: str = "", parent=None) -> None:
         super().__init__(parent)
         self.mode = mode
         self.text_label = text
@@ -121,9 +121,6 @@ class RailButton(QAbstractButton):
         checked = self.isChecked()
         glyph_color = QColor(t.on_accent if checked else t.text_dim)
         text_color = QColor(t.on_accent if checked else t.muted)
-        index_color = QColor(t.on_accent if checked else t.faint)
-        if checked:
-            index_color.setAlpha(150)
 
         self._draw_icon(p, glyph_color)
 
@@ -131,13 +128,7 @@ class RailButton(QAbstractButton):
         label_font.setPixelSize(11)
         p.setFont(label_font)
         p.setPen(text_color)
-        p.drawText(QRect(0, 36, rect.width(), 16), Qt.AlignCenter, self.text_label)
-
-        idx_font = QFont(t.mono)
-        idx_font.setPixelSize(10)
-        p.setFont(idx_font)
-        p.setPen(index_color)
-        p.drawText(QRect(0, 55, rect.width(), 10), Qt.AlignCenter, self.index)
+        p.drawText(QRect(0, 42, rect.width(), 18), Qt.AlignCenter, self.text_label)
         p.end()
 
     def _draw_icon(self, p: QPainter, color: QColor) -> None:
@@ -272,7 +263,7 @@ class ThemeSwitcher(QWidget):
         font.setPixelSize(10)
         p.setFont(font)
         p.setPen(QColor(t.faint))
-        p.drawText(QRect(0, 5, 36, 20), Qt.AlignRight | Qt.AlignVCenter, "SKIN")
+        p.drawText(QRect(0, 5, 36, 20), Qt.AlignRight | Qt.AlignVCenter, "皮肤")
         for i, key in enumerate(THEME_ORDER):
             th = THEMES[key]
             center = self._circles()[i]

@@ -428,6 +428,19 @@ QScrollBar::handle:horizontal { background: $scroll; min-width: 22px; border-rad
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
 QToolTip { background: $card; color: $text; border: 1px solid $line; padding: 4px 6px; font-size: 12px; }
+
+/* workspace views */
+QFrame#ViewHead { background: transparent; border-bottom: 1px solid $line; }
+QLabel#ViewTitle { font-family: "$serif"; font-size: 20px; font-weight: 600; color: $text; }
+QLabel#ViewSub { font-family: "$mono"; font-size: 11px; color: $muted; }
+QLabel#DemoBadge { font-family: "$mono"; font-size: 10px; color: $accent; border: 1px solid $accent; border-radius: $radius; padding: 1px 6px; }
+QPushButton#LinkButton { background: transparent; border: none; color: $accent; font-family: "$mono"; font-size: 11px; padding: 2px 0; }
+QPushButton#LinkButton:hover { color: $accent_deep; }
+QFrame#AlgoCard, QFrame#Card { background: $card; border: 1px solid $line; border-radius: $radius; }
+QLabel#AlgoTitle { font-family: "$mono"; font-size: 11px; color: $text_dim; }
+QLabel#AlgoLine { font-family: "$mono"; font-size: 10px; color: $muted; }
+QLabel#AlgoStep { font-family: "$mono"; font-size: 10px; color: $text_dim; }
+QFrame#DocBar { background: $panel_alt; border-bottom: 1px solid $line; }
     """
 )
 
