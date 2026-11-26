@@ -44,7 +44,7 @@ class RecommendationEngine:
         self._word_to_id = HashTable()
         self._words = []
         for document in documents:
-            for token in document.body_tokens:
+            for token in document.body_analysis_tokens:
                 if self._word_to_id.get(token.word, -1) == -1:
                     word_id = len(self._words)
                     self._word_to_id.put(token.word, word_id)
@@ -59,7 +59,7 @@ class RecommendationEngine:
 
         for document in documents:
             vector = self._term_counts[document.doc_id]
-            for token in document.body_tokens:
+            for token in document.body_analysis_tokens:
                 word_id = self._word_to_id.get(token.word)
                 if word_id is None:
                     continue

@@ -1263,8 +1263,11 @@ class FrequencyView(QWidget):
 
         report = self.c._ensure_freq()
         self._report = report
+        analysis_label = (
+            "演示数据" if getattr(self.c.service, "is_demo", False) else "常用词已过滤"
+        )
         if report is None or not report.top_k:
-            self.header.set_sub(f"范围：{self.c._freq_scope_name()}")
+            self.header.set_sub(f"范围：{self.c._freq_scope_name()} · {analysis_label}")
             clear_layout(self.words_lay)
             hint = QLabel("这个范围里没有可统计的词，换一个范围试试。")
             hint.setObjectName("Note")
@@ -1282,7 +1285,7 @@ class FrequencyView(QWidget):
         scope = self.c._freq_scope_name()
         distinct = len(report.quick_sorted)
         tokens = sum(item.count for item in report.quick_sorted)
-        self.header.set_sub(f"范围：{scope}")
+        self.header.set_sub(f"范围：{scope} · {analysis_label}")
         self.hash_count.setText(f"{distinct} 个词 · {tokens} 个词次")
         self.hash_grid.set_items(report.quick_sorted)
 

@@ -1,4 +1,4 @@
-"""使用 jieba 精确模式分词，并保留原文字符偏移。"""
+"""使用 jieba 精确模式分词并保留字符偏移；检索与分析可选择不同停用词策略。"""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ class Tokenizer:
         return words
 
     def tokenize(self, text: str, keep_stopwords: bool = False) -> list[Token]:
+        """检索设置 keep_stopwords=True；默认模式过滤分析停用词。"""
         tokens: list[Token] = []
         for word, start, end in jieba.tokenize(text, mode="default"):
             normalized = word.casefold()

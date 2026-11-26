@@ -51,6 +51,34 @@ class SampleCorpusTests(unittest.TestCase):
         self.assertTrue(
             any(node.doc_id == 0 and node.hop == 0 for node in recommendation.graph.nodes)
         )
+    def test_search_keeps_modal_words_while_analysis_filters_them(self) -> None:
+        service = LibraryService(SAMPLE_ROOT)
+        service.load()
+
+        search_results = service.search("可能")
+        self.assertTrue(search_results)
+        self.assertTrue(
+            any("可能" in result.relative_path or any(hit.word == "可能" for hit in result.hits)
+                for result in search_results)
+        )
+
+        frequency = service.analyze_frequency(folder_path="", k=1000)
+        frequency_words = {entry.word for entry in frequency.quick_sorted}
+        self.assertFalse({"可能", "会"} & frequency_words, "分析词频应排除常见语气词")
+
+        center_id = next(
+            document.doc_id
+            for document in service.list_folder("天文学/天体")
+            if document.relative_path.endswith("恒星的形成与演化.md")
+        )
+        recommendations = service.recommend(center_id, "balanced", limit=10)
+        shared_words = {
+            word
+            for item in recommendations.items
+            for word in item.shared_keywords
+        }
+        self.assertNotIn("可能", shared_words)
+        self.assertNotIn("会", shared_words)
 
 
 if __name__ == "__main__":

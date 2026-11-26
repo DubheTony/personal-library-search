@@ -37,7 +37,7 @@ class SearchEngine:
             return self._search_phrase(query, tokenizer)
 
         words: list[str] = []
-        for token in tokenizer.tokenize(query):
+        for token in tokenizer.tokenize(query, keep_stopwords=True):
             if token.word not in words:
                 words.append(token.word)
         if not words:

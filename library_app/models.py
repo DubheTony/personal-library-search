@@ -20,6 +20,7 @@ class Document:
     body: str
     title_tokens: list[Token] = field(default_factory=list)
     body_tokens: list[Token] = field(default_factory=list)
+    body_analysis_tokens: list[Token] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

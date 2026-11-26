@@ -69,8 +69,9 @@ class LibraryRepository:
                 relative_path=relative_path,
                 title=title,
                 body=body,
-                title_tokens=tokenizer.tokenize(title),
-                body_tokens=tokenizer.tokenize(body),
+                title_tokens=tokenizer.tokenize(title, keep_stopwords=True),
+                body_tokens=tokenizer.tokenize(body, keep_stopwords=True),
+                body_analysis_tokens=tokenizer.tokenize(body),
             )
             self._documents.append(document)
             parent_node = self._find_directory(relative_path.rpartition("/")[0])

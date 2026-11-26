@@ -12,7 +12,7 @@ An offline document search and recommendation tool for Windows. It reads local M
 
 - Browse documents by directory.
 - Search full text with multiple keywords and see matching documents, locations, and context; phrase search is also available.
-- Count word frequencies for a document or directory and compare the results of two sorting algorithms.
+- Count word frequencies for a document or directory (common words are filtered from analysis) and compare two sorting algorithms. Full-text search still indexes those words.
 - Recommend documents based on directory relationships, word frequencies in their text, and shared high-frequency words; show each factor, association paths, document clusters, and a relationship graph.
 - Process documents locally without uploading them.
 

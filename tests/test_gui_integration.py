@@ -53,6 +53,7 @@ class RealBackendGuiIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(window.canvas.doc_panel)
 
             window.open_freq_for_doc()
+            self.assertIn("常用词已过滤", window.frequency_view.header.sub.text())
             report = window._ensure_freq()
             self.assertIsNotNone(report)
             self.assertEqual(
@@ -88,6 +89,8 @@ class RealBackendGuiIntegrationTests(unittest.TestCase):
             self.assertTrue(getattr(service, "is_demo", False))
             self.assertEqual(window.summary.document_count, 20)
             self.assertEqual(len(window.docs_by_id), 20)
+            window.open_freq_for_doc()
+            self.assertIn("演示数据", window.frequency_view.header.sub.text())
 
 
 if __name__ == "__main__":

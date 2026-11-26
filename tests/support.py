@@ -29,5 +29,7 @@ def create_repository_document(doc_id: int, path: str, body: str):
         relative_path=path,
         title=Path(path).stem,
         body=body,
-        body_tokens=tokenizer.tokenize(body),
+        title_tokens=tokenizer.tokenize(Path(path).stem, keep_stopwords=True),
+        body_tokens=tokenizer.tokenize(body, keep_stopwords=True),
+        body_analysis_tokens=tokenizer.tokenize(body),
     )

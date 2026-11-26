@@ -21,7 +21,7 @@ class FrequencyAnalyzer:
         for doc_id in doc_ids:
             if doc_id < 0 or doc_id >= len(documents):
                 raise ValueError(f"无效文档编号：{doc_id}")
-            for token in documents[doc_id].body_tokens:
+            for token in documents[doc_id].body_analysis_tokens:
                 counts.put(token.word, (counts.get(token.word, 0) or 0) + 1)
 
         entries = [WordCount(word, count) for word, count in counts.items()]
