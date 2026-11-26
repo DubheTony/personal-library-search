@@ -18,7 +18,7 @@ An offline document search and recommendation tool for Windows. It reads local M
 
 ## Current status
 
-The repository includes document readers, word segmentation, inverted-index search, word-frequency analysis, related-document recommendations, a shared service interface, automated tests, and a PySide6 desktop interface. A full sample document library has not yet been added to the repository.
+The repository includes document readers, tokenization, inverted-index search, word-frequency analysis, related-document recommendations, a shared service interface, automated tests, and a PySide6 desktop interface. Its sample library contains 34 original knowledge explainers organized into five subject areas.
 
 ## Desktop interface
 
@@ -35,7 +35,7 @@ The interface prefers the real `LibraryService`. If there is no `样例资料库
 
 The interface has three sections: directory, word frequency, and recommendations. The top search box supports word search and exact phrase search; submitting it opens a separate results view with snippets, hit positions, highlights, and document opening. The directory view shows a combined folder/document tree and animates a depth-first traversal on the right. The word-frequency view shows a hash-count grid, the Top-K min-heap, and block animations for quick/merge sort. The recommendation view shows the three score parts, weights, reasons, association paths, document clusters, and a two-hop graph anchored at the current start document. Documents open in a separate reading view with a collapsible directory and can be set as the recommendation start. In the top-right corner, you can switch between the “纸质档案”, “观察台”, and “制图台” visual themes. The `− / percentage / +` controls at the top zoom the entire page from 85% to 150% (125% by default). You can also use `Ctrl + mouse wheel`, `Ctrl+=`, `Ctrl+-`, or `Ctrl+0`.
 
-The sample document library remains excluded from the repository by `.gitignore`.
+The sample library is included in the repository in Markdown, plain-text, and Word formats.
 
 ## Install and test
 
